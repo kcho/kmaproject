@@ -8,8 +8,14 @@ import argparse
 import textwrap
 import os                                    # system functions
 
-def main(args):
-    print args.subjects
+def tractography(args):
+    '''
+    It runs probabilistic tractography
+    from thalamus to orbitofrontal cortex.
+    It requires FSL, Freesurfer and nipype.
+    All cortical ROIs in the contralateral hemisphere 
+    and the cerebellum are used as exclusion mask.
+    '''
     subject_list = args.subjects
 
     '''Dictionary for datasource'''
@@ -175,5 +181,5 @@ if __name__ == '__main__':
         help='side')
     args = parser.parse_args()
 
-    main(args)
+    tractography(args)
     #print sys.argv

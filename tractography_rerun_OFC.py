@@ -87,6 +87,17 @@ def tractography(args):
     cortexStopRoiMaker = pe.Node(interface=fsl.MultiImageMaths(), name='add_masks')
     cortexStopRoiMaker.inputs.op_string = '-add %s '* 15
 
+    '''
+    2   Left-Cerebral-White-Matter              245 245 245 0
+    41  Right-Cerebral-White-Matter             0   225 0   0
+    '''
+    wmExtract = pe.Node(interface=fs.Binarize(out_type='nii.gz'), name='wmExtract')
+    if args.side == 'lh':
+        wmExtract.inputs.match = [2]
+    else:
+        wmExtract.inputs.match = [41]
+
+
 
 
     '''Probabilistic tractography'''
@@ -105,7 +116,7 @@ def tractography(args):
 
     '''Data sink'''
     datasink = pe.Node(interface=nio.DataSink(),name='datasink')
-    datasink.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project/OFC_tractography')
+    datasink.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project/OFC_tractography_wm')
     datasink.inputs.substitutions = [('_variable', 'variable'),
                                      ('_subject_id_', 'subject_id')]
 
@@ -114,9 +125,10 @@ def tractography(args):
     dwiproc.base_dir = os.path.abspath('tractography_OFC')
     dwiproc.connect([
                         (infosource,datasource,[('subject_id', 'subject_id')]),
-                        (datasource, insulaExtract, [('aparc_aseg', 'in_file')]),
+                        #(datasource, insulaExtract, [('aparc_aseg', 'in_file')]),
                         (datasource, brainStemExtract, [('aseg', 'in_file')]),
-                        (insulaExtract,cortexStopRoiMaker,[('binary_file', 'in_file')]),
+                        (datasource, wmExtract, [('aseg', 'in_file')]),
+                        (wmExtract, cortexStopRoiMaker,[('binary_file', 'in_file')]),
                         (datasource,cortexStopRoiMaker,[(('exclusion_masks',get_opposite), 'operand_files')]),
                         #(cortexStopRoiMaker, allStopRoiMaker,[('out_file', 'in_file')]),
                         #(brainStemExtract, allStopRoiMaker,[('out_file', 'operand_files')]),
@@ -165,12 +177,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent('''\
-            {codeName} : Search files with user defined extensions 
+            {codeName} : Runs thalamo-cortical probabilistic tractography 
             ========================================
-            eg) {codeName} -e 'dcm|ima' -i /Users/kevin/NOR04_CKI
-                Search dicom files in /Users/kevin/NOR04_CKI
-            eg) {codeName} -c -e 'dcm|ima' -i /Users/kevin/NOR04_CKI
-                Count dicom files in each directory under input 
             '''.format(codeName=os.path.basename(__file__))))
     parser.add_argument(
         '-s', '--subjects',
@@ -182,4 +190,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     tractography(args)
-    #print sys.argv

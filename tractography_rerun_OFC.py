@@ -42,7 +42,9 @@ def tractography(args):
                 seed_file=[['subject_id', 'thalamus']],
                 target_mask=[['subject_id', 'OFC']],
                 exclusion_masks=[['subject_id', 
-                    ['LPFC', 'LTC', 'MPFC','MTC','OCC','OFC','PC','SMC']]],
+                    ['LPFC', 'LTC', 'MPFC','MTC',
+                     'OCC','OFC','PC','SMC']]],
+                posterior_em = [['subject_id', '_post_thal_excl_mask.nii.gz']],
                 thsample = [['subject_id',
                     ['merged_th1samples','merged_th2samples']]],
                 phsample = [['subject_id',
@@ -74,6 +76,7 @@ def tractography(args):
                                             seed_file='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
                                             target_mask='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
                                             exclusion_masks='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            posterior_em='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
                                             matrix='%s/registration/%s',
                                             bet_mask='%s/dti/%s.nii.gz',
                                             thsample='%s/DTI.bedpostX/%s.nii.gz',
@@ -86,38 +89,29 @@ def tractography(args):
     datasource.inputs.template_args = info
     datasource.inputs.sort_filelist = True
 
-
-    '''Freesurfer'''
-    insulaExtract= pe.Node(interface=fs.Binarize(out_type='nii.gz'), name='insula')
-    if args.side == 'lh':
-        insulaExtract.inputs.match = [1035, 2035]
-    else:
-        insulaExtract.inputs.match = [1035, 2035]
-
     brainStemExtract = pe.Node(interface=fs.Binarize(out_type='nii.gz'), name='brainStem')
     brainStemExtract.inputs.match = [16, 6, 7, 8, 45, 46, 47]
 
-    '''
-    Merge output from freesurfer binarize : 
-    15 because 8 + 7 cortical ROIs (infile is insula)
-    '''
-    cortexStopRoiMaker = pe.Node(interface=fsl.MultiImageMaths(), name='add_masks')
-    cortexStopRoiMaker.inputs.op_string = '-add %s '* 15
 
-    '''
-    2   Left-Cerebral-White-Matter              245 245 245 0
-    41  Right-Cerebral-White-Matter             0   225 0   0
-    '''
     wmExtract = pe.Node(interface=fs.Binarize(out_type='nii.gz'), name='wmExtract')
+    #    2   Left-Cerebral-White-Matter              245 245 245 0
+    #    41  Right-Cerebral-White-Matter             0   225 0   0
     if args.side == 'lh':
         # needs to put the contralateral hemisphere
         wmExtract.inputs.match = [41]
     else:
         wmExtract.inputs.match = [2]
 
-
     
+    # Merge exclusion ROIs
+    # - brain stem
+    # - contralateral hemisphere white matter 
+    # - slice posterior to the thalamus 
+    bs_add_wm = pe.Node(interface=fsl.MultiImageMaths(), name='add_masks')
+    bs_add_wm.inputs.op_string = '-add %s'
 
+    bs_add_wm_add_ex = pe.Node(interface=fsl.MultiImageMaths(), name='add_masks')
+    bs_add_wm_add_ex.inputs.op_string = '-add %s'
 
 
     '''Probabilistic tractography'''
@@ -142,18 +136,16 @@ def tractography(args):
 
     ''' Workflow '''
     dwiproc = pe.Workflow(name="dwiproc_OFC")
-    dwiproc.base_dir = os.path.abspath('tractography_OFC')
+    dwiproc.base_dir = os.path.abspath('tractography_OFC_wm_pthalex')
     dwiproc.connect([
                         (infosource,datasource,[('subject_id', 'subject_id')]),
-                        #(datasource, insulaExtract, [('aparc_aseg', 'in_file')]),
                         (datasource, brainStemExtract, [('aseg', 'in_file')]),
                         (datasource, wmExtract, [('aseg', 'in_file')]),
-                        (wmExtract, cortexStopRoiMaker,[('binary_file', 'in_file')]),
-                        (datasource,cortexStopRoiMaker,[(('exclusion_masks',get_opposite), 'operand_files')]),
-                        #(cortexStopRoiMaker, allStopRoiMaker,[('out_file', 'in_file')]),
-                        #(brainStemExtract, allStopRoiMaker,[('out_file', 'operand_files')]),
-                        #(allStopRoiMaker, probtrackx,[('out_file', 'avoid_mp')]),
-                        (cortexStopRoiMaker, probtrackx,[('out_file', 'avoid_mp')]),
+                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
+                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
+                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
+                        (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
+                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
                         (datasource,probtrackx,[('seed_file','seed'),
                                                    ('target_mask','stop_mask'),
                                                    ('target_mask','waypoints'),
@@ -169,6 +161,7 @@ def tractography(args):
                             ('targets', 'probtrackx.@targets'),
                             ('way_total', 'probtrackx.@way_total'),
                             ])
+                        (bs_add_wm_add_ex,datasink,[('out_file','exclusion_mask')]),
                     ])
 
     '''Parallel processing'''

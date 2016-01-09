@@ -93,9 +93,10 @@ def tractography(args):
     '''
     wmExtract = pe.Node(interface=fs.Binarize(out_type='nii.gz'), name='wmExtract')
     if args.side == 'lh':
-        wmExtract.inputs.match = [2]
-    else:
+        # needs to put the contralateral hemisphere
         wmExtract.inputs.match = [41]
+    else:
+        wmExtract.inputs.match = [2]
 
 
 

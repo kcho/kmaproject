@@ -159,7 +159,7 @@ def tractography(args):
                             ('log', 'probtrackx.@log'),
                             ('particle_files', 'probtrackx.@particle_files'),
                             ('targets', 'probtrackx.@targets'),
-                            ('way_total', 'probtrackx.@way_total'),
+                            ('way_total', 'probtrackx.@way_total')
                             ])
                         (bs_add_wm_add_ex,datasink,[('out_file','exclusion_mask')]),
                     ])

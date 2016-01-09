@@ -27,7 +27,7 @@ def tractography(args):
     '''
     for subject in subject_list:
         for side in ['lh', 'rh']:
-            roiLoc = os.path.join(dataLoc, subject_list, 'ROI')
+            roiLoc = os.path.join(dataLoc, subject, 'ROI')
             thalamusROI = os.path.join(roiLoc, side+'_thalamus.nii.gz')
             newROI = os.path.join(roiLoc,side+'_post_thal_excl_mask.nii.gz')
                     

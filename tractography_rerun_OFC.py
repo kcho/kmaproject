@@ -4,6 +4,7 @@ import nipype.interfaces.fsl as fsl          # fsl
 import nipype.interfaces.freesurfer as fs
 import nipype.interfaces.utility as util     # utility
 import nipype.pipeline.engine as pe          # pypeline engine
+import nibabel
 import argparse
 import textwrap
 import os                                    # system functions
@@ -100,7 +101,6 @@ def tractography(args):
 
 
 
-
     '''Probabilistic tractography'''
     probtrackx = pe.Node(interface=fsl.ProbTrackX2(), name='probtrackx_OFC')
     probtrackx.inputs.onewaycondition= True
@@ -172,6 +172,33 @@ def get_opposite(roiList):
                 newList.append(i)
         print newList
     return newList
+
+
+
+
+def thalamusPosterior(thalamusImg):
+    roiLoc = os.path.dirname(thalamusImg)
+    side = os.path.basename(thalamusImg)[:2]
+
+
+    # ROI load
+    f = nb.load(thalamusImg)
+    data = f.get_data()
+
+    # find lowest z coordinate
+    z_length = data.shape[2]
+    for sliceNum in range(z_length):
+        if 1 in data[:,:,sliceNum]:
+            break
+
+    newArray = np.zeros_like(data)
+    newArray[:,:,sliceNum] = 1
+
+    newROI = os.path.join(roiLoc,side+'_post_thal_excl_mask.nii.gz')
+    nb.Nifti1Image(newArray, f.affine).to_filename(newROI)
+
+    return newROI
+
 
 
 if __name__ == '__main__':

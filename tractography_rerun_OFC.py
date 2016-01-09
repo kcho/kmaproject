@@ -5,6 +5,7 @@ import nipype.interfaces.freesurfer as fs
 import nipype.interfaces.utility as util     # utility
 import nipype.pipeline.engine as pe          # pypeline engine
 import nibabel
+import numpy as np
 import argparse
 import textwrap
 import os                                    # system functions
@@ -17,7 +18,22 @@ def tractography(args):
     All cortical ROIs in the contralateral hemisphere 
     and the cerebellum are used as exclusion mask.
     '''
+    dataLoc = '/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project'
     subject_list = args.subjects
+
+    '''
+    Make exclusion mask in order to exclude tracks
+    going towards posterior paths from the thalamus
+    '''
+    for subject in subject_list:
+        for side in ['lh', 'rh']:
+            roiLoc = os.path.join(dataLoc, subject_list, 'ROI')
+            thalamusROI = os.path.join(roiLoc, side+'_thalamus.nii.gz')
+            newROI = os.path.join(roiLoc,side+'_post_thal_excl_mask.nii.gz')
+                    
+            if not os.path.isfile(newROI):
+                thalamusPosterior(thalamusROI)
+
 
     '''Dictionary for datasource'''
     info = dict(dwi=[['subject_id', 'data']],
@@ -51,7 +67,7 @@ def tractography(args):
                                                    outfields=info.keys()),
                          name = 'datasource')
     datasource.inputs.template = "%s/%s"
-    datasource.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project')
+    datasource.inputs.base_directory = os.path.abspath(dataLoc)
     datasource.inputs.field_template = dict(dwi='%s/dti/%s.nii.gz',
                                             bvecs='%s/dti/%s',
                                             bvals='%s/dti/%s',
@@ -98,6 +114,9 @@ def tractography(args):
         wmExtract.inputs.match = [41]
     else:
         wmExtract.inputs.match = [2]
+
+
+    
 
 
 
@@ -196,8 +215,6 @@ def thalamusPosterior(thalamusImg):
 
     newROI = os.path.join(roiLoc,side+'_post_thal_excl_mask.nii.gz')
     nb.Nifti1Image(newArray, f.affine).to_filename(newROI)
-
-    return newROI
 
 
 

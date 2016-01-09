@@ -4,7 +4,7 @@ import nipype.interfaces.fsl as fsl          # fsl
 import nipype.interfaces.freesurfer as fs
 import nipype.interfaces.utility as util     # utility
 import nipype.pipeline.engine as pe          # pypeline engine
-import nibabel
+import nibabel as nb
 import numpy as np
 import argparse
 import textwrap

@@ -20,6 +20,7 @@ def tractography(args):
     '''
     dataLoc = '/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project'
     subject_list = args.subjects
+    atlasLoc = '/usr/local/fsl/data/atlases/MNI/MNI-maxprob-thr0-1mm'
 
     # Make exclusion mask in order to exclude tracks
     # going towards posterior paths from the thalamus
@@ -32,6 +33,43 @@ def tractography(args):
             if not os.path.isfile(newROI):
                 thalamusPosterior(thalamusROI)
 
+            regLoc = os.path.join(dataLoc, subject, 'registration')
+            temporalExROI = 'MNI_temporal_mask.nii.gz')
+            temporalExROI_sub = os.path.join(roiLoc, 'temporalExROI.nii.gz')
+            mni2subj = os.path.join(roiLoc, 'mni2subj.mat')
+            subjBrain = os.path.join(dataLoc, subject, 'FREESURFER',
+                    'mri','brain.nii.gz')
+
+            if not os.path.isfile(temporalExROI_sub):
+                # Registration
+                if not os.path.isfile(mni2subj)
+                    MNIreg = fsl.FLIRT(
+                            in_file = atlasLoc,
+                            reference = subjBrain,
+                            interp = 'nearestneighbour',
+                            out_matrix_file = mni2subj)
+                    MNIreg.run()
+
+                # ROI extraction
+                if not os.path.isfile(temporalExROI):
+                    extractTC = fsl.ImageMaths(
+                            in_file = atlasLoc,
+                            op_string = '-thr 8 -uthr 8',
+                            out_file = temporalExROI,
+                            )
+                    extractTC.run()
+
+                # Apply registration
+                if not os.path. isfile(temporalExROI_sub):
+                    TC_to_subj = fsl.ApplyXfm(
+                            in_file = temporalExROI,
+                            reference = subjBrain,
+                            interp = 'nearestneighbour',
+                            in_matrix_file = mni2subj,
+                            out_file = temporalExROI_sub)
+                    TC_to_subj.run()
+
+
 
     # Dictionary for datasource
     info = dict(dwi=[['subject_id', 'data']],
@@ -43,6 +81,7 @@ def tractography(args):
                     ['LPFC', 'LTC', 'MPFC','MTC',
                      'OCC','OFC','PC','SMC']]],
                 posterior_em = [['subject_id', 'post_thal_excl_mask']],
+                TC_em = [['subject_id', 'temporalExROI']],
                 thsample = [['subject_id',
                     ['merged_th1samples','merged_th2samples']]],
                 phsample = [['subject_id',
@@ -75,6 +114,7 @@ def tractography(args):
                                             target_mask='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
                                             exclusion_masks='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
                                             posterior_em='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            TC_em='%s/ROI/%s.nii.gz',
                                             matrix='%s/registration/%s',
                                             bet_mask='%s/dti/%s.nii.gz',
                                             thsample='%s/DTI.bedpostX/%s.nii.gz',
@@ -104,13 +144,15 @@ def tractography(args):
     # - brain stem
     # - contralateral hemisphere white matter 
     # - slice posterior to the thalamus 
-    bs_add_wm = pe.Node(interface=fsl.MultiImageMaths(), name='initialMask')
+    # - temporal lobe
+    bs_add_wm = pe.Node(interface=fsl.MultiImageMaths(), name='add_wm')
     bs_add_wm.inputs.op_string = '-add %s'
 
-    bs_add_wm_add_ex = pe.Node(interface=fsl.MultiImageMaths(), name='exclusionMask')
+    bs_add_wm_add_ex = pe.Node(interface=fsl.MultiImageMaths(), name='add_posterior_plane')
     bs_add_wm_add_ex.inputs.op_string = '-add %s'
 
-
+    bs_add_wm_add_ex_add_tc = pe.Node(interface=fsl.MultiImageMaths(), name='add_temporal_lobe')
+    bs_add_wm_add_ex_add_tc.inputs.op_string = '-add %s'
     # Probabilistic tractography
     probtrackx = pe.Node(interface=fsl.ProbTrackX2(), name='probtrackx_OFC')
     probtrackx.inputs.onewaycondition= True
@@ -142,7 +184,8 @@ def tractography(args):
                         (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
                         (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
                         (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
-                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
+                        (bs_add_wm_add_ex, bs_add_wm_add_ex_add_tc, [('out_file', 'in_file')]),
+                        (bs_add_wm_add_ex_add_tc, probtrackx,[('out_file', 'avoid_mp')]),
                         (bs_add_wm_add_ex,datasink,[('out_file','exclusion_mask')]),
                         (datasource,probtrackx,[('seed_file','seed'),
                                                    ('target_mask','stop_mask'),

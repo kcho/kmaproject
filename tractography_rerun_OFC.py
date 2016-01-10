@@ -20,7 +20,7 @@ def tractography(args):
     '''
     dataLoc = '/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project'
     subject_list = args.subjects
-    atlasLoc = '/usr/local/fsl/data/atlases/MNI/MNI-maxprob-thr0-1mm'
+    atlasLoc = '/usr/local/fsl/data/atlases/MNI/MNI-maxprob-thr0-1mm.nii.gz'
 
     # Make exclusion mask in order to exclude tracks
     # going towards posterior paths from the thalamus
@@ -34,7 +34,7 @@ def tractography(args):
                 thalamusPosterior(thalamusROI)
 
             regLoc = os.path.join(dataLoc, subject, 'registration')
-            temporalExROI = 'MNI_temporal_mask.nii.gz')
+            temporalExROI = 'MNI_temporal_mask.nii.gz'
             temporalExROI_sub = os.path.join(roiLoc, 'temporalExROI.nii.gz')
             mni2subj = os.path.join(roiLoc, 'mni2subj.mat')
             subjBrain = os.path.join(dataLoc, subject, 'FREESURFER',
@@ -42,7 +42,7 @@ def tractography(args):
 
             if not os.path.isfile(temporalExROI_sub):
                 # Registration
-                if not os.path.isfile(mni2subj)
+                if not os.path.isfile(mni2subj):
                     MNIreg = fsl.FLIRT(
                             in_file = atlasLoc,
                             reference = subjBrain,
@@ -184,9 +184,10 @@ def tractography(args):
                         (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
                         (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
                         (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
+                        (datasource, bs_add_wm_add_ex_add_tc, [('TC_em', 'operand_files')]),
                         (bs_add_wm_add_ex, bs_add_wm_add_ex_add_tc, [('out_file', 'in_file')]),
                         (bs_add_wm_add_ex_add_tc, probtrackx,[('out_file', 'avoid_mp')]),
-                        (bs_add_wm_add_ex,datasink,[('out_file','exclusion_mask')]),
+                        (bs_add_wm_add_ex_add_tc, datasink,[('out_file','exclusion_mask')]),
                         (datasource,probtrackx,[('seed_file','seed'),
                                                    ('target_mask','stop_mask'),
                                                    ('target_mask','waypoints'),

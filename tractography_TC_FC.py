@@ -220,7 +220,7 @@ def thal_TC_posterior(thalamusImg, TC_img):
     f_thal = nb.load(thalamusImg)
     data_thal = f_thal.get_data()
 
-    f_TC = nb.load(TCamusImg)
+    f_TC = nb.load(TC_img)
     data_TC = f_TC.get_data()
 
     # find lowest z coordinate

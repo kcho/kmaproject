@@ -88,9 +88,9 @@ def tractography(args):
                 bvecs=[['subject_id', 'bvecs']],
                 bvals=[['subject_id', 'bvals']],
                 SEED=[['subject_id', 
-                    ['LTC', 'MTC', 'TC']]],
+                    ['THAL', 'THAL','TC']]],
                 STOP=[['subject_id', 
-                    ['LPFC', 'MPFC', 'FC']]],
+                    ['FC',   'TC',  'FC']]],
                 posterior_TC_em = [['subject_id', 'post_thal_TC_excl_mask']],
                 posterior_THAL_em = [['subject_id', 'post_thal_excl_mask']],
                 thsample = [['subject_id',
@@ -186,7 +186,7 @@ def tractography(args):
                                      ('_subject_id_', '')]
 
     # Workflow 
-    dwiproc = pe.Workflow(name="iterables_Mapnode")
+    dwiproc = pe.Workflow(name="Thal_TC_FC")
     dwiproc.base_dir = os.path.abspath('tractography')
     dwiproc.connect([
                         (infosource,datasource,[('subject_id', 'subject_id')]),

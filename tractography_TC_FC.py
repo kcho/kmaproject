@@ -13,18 +13,35 @@ import os                                    # system functions
 def tractography(args):
     '''
     It runs probabilistic tractography
-    from thalamus to orbitofrontal cortex.
+    from temporal cortex to frontal cortex.
     It requires FSL, Freesurfer and nipype.
 
+    Temporal cortex labels are
+    - Superior, Middle, and Inferior Temporal
+    - Banks of the Superior Temporal Sulcus
+    - Fusiform
+    - Transverse Temporal
+    - Entorhinal
+    - Temporal Pole
+    - Parahippocampal
+
+    Frontal cortex labels are
+    - Superior Frontal
+    - Rostral and Caudal Middle Frontal
+    - Pars Opercularis, Pars Triangularis, and Pars Orbitalis
+    - Lateral and Medial Orbitofrontal
+    - Precentral
+    - Paracentral
+    - Frontal Pole
+
     Exclusion masks are
-    - All cortical ROIs in the contralateral hemisphere 
+    - WM in the contralateral hemisphere 
     - Brain stem
     - Cerebellum 
-    - Ipsilateral temporal lobe
+    - A coronal plane posterior to the temporal cortex
     '''
     dataLoc = '/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project'
     subject_list = args.subjects
-    atlasLoc = '/usr/local/fsl/data/atlases/MNI/MNI-maxprob-thr0-1mm.nii.gz'
 
     # Make exclusion mask in order to exclude tracks
     # going towards posterior paths from the thalamus
@@ -32,46 +49,38 @@ def tractography(args):
         for side in ['lh', 'rh']:
             roiLoc = os.path.join(dataLoc, subject, 'ROI')
             thalamusROI = os.path.join(roiLoc, side+'_thalamus.nii.gz')
+            LTC = os.path.join(roiLoc, side+'_LTC.nii.gz')
+            MTC = os.path.join(roiLoc, side+'_MTC.nii.gz')
+            TC_ROI = os.path.join(roiLoc, side+'_TC.nii.gz')
+
+            OFC = os.path.join(roiLoc, side+'_OFC.nii.gz')
+            LPFC = os.path.join(roiLoc, side+'_LPFC.nii.gz')
+            MPFC = os.path.join(roiLoc, side+'_MPFC.nii.gz')
+            FC_ROI = os.path.join(roiLoc, side+'_FC.nii.gz')
+
             plan_exclusion_mask = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
-                    
-            regLoc = os.path.join(dataLoc, subject, 'registration')
-            temporalExROI = 'MNI_temporal_mask.nii.gz'
-            temporalExROI_sub = os.path.join(roiLoc, 'temporalExROI.nii.gz')
-            mni2subj = os.path.join(roiLoc, 'mni2subj.mat')
-            subjBrain = os.path.join(dataLoc, subject, 'FREESURFER',
-                    'mri','brain.nii.gz')
 
-            if not os.path.isfile(temporalExROI_sub):
-                # Registration
-                if not os.path.isfile(mni2subj):
-                    MNIreg = fsl.FLIRT(
-                            in_file = atlasLoc,
-                            reference = subjBrain,
-                            interp = 'nearestneighbour',
-                            out_matrix_file = mni2subj)
-                    MNIreg.run()
+            if not os.path.isfile(TC_ROI):
+                merge_LTC_MTC = fsl.MultiImageMaths(
+                        in_file = LTC,
+                        operand_files = [MTC],
+                        op_string = '-add %s',
+                        out_file = TC_ROI,
+                        )
+                merge_LTC_MTC.run()
 
-                # ROI extraction
-                if not os.path.isfile(temporalExROI):
-                    extractTC = fsl.ImageMaths(
-                            in_file = atlasLoc,
-                            op_string = '-thr 8 -uthr 8',
-                            out_file = temporalExROI,
-                            )
-                    extractTC.run()
+            if not os.path.isfile(FC_ROI):
+                merge_LPFC_MPFC_OFC = fsl.MultiImageMaths(
+                        in_file = LPFC,
+                        operand_files = [MPFC, OFC],
+                        op_string = '-add %s -add %s',
+                        out_file = FC_ROI,
+                        )
+                merge_LPFC_MPFC_OFC.run()
 
-                # Apply registration
-                if not os.path. isfile(temporalExROI_sub):
-                    TC_to_subj = fsl.ApplyXfm(
-                            in_file = temporalExROI,
-                            reference = subjBrain,
-                            interp = 'nearestneighbour',
-                            in_matrix_file = mni2subj,
-                            out_file = temporalExROI_sub)
-                    TC_to_subj.run()
 
             if not os.path.isfile(plan_exclusion_mask):
-                thal_TC_posterior(thalamusROI, temporalExROI_sub)
+                thal_TC_posterior(thalamusROI, TC_ROI)
 
 
     # Dictionary for datasource
@@ -248,7 +257,7 @@ def thal_TC_posterior(thalamusImg, TC_img):
             break
 
     z_length = data_thal.shape[2]
-    for sliceNumTC in range(z_length):
+    for sliceNumTC in range(sliceNumThal):
         if 1 in data_TC[:,:,sliceNumTC]:
             break
 

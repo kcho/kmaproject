@@ -87,13 +87,9 @@ def tractography(args):
     info = dict(dwi=[['subject_id', 'data']],
                 bvecs=[['subject_id', 'bvecs']],
                 bvals=[['subject_id', 'bvals']],
-                seed_file=[['subject_id', 'thalamus']],
-                target_mask=[['subject_id', 'OFC']],
-                exclusion_masks=[['subject_id', 
-                    ['LPFC', 'LTC', 'MPFC','MTC',
-                     'OCC','OFC','PC','SMC']]],
+                FC=[['subject_id', 'FC']],
+                TC=[['subject_id', 'TC']],
                 posterior_em = [['subject_id', 'post_thal_TC_excl_mask']],
-                TC_em = [['subject_id', 'temporalExROI']],
                 thsample = [['subject_id',
                     ['merged_th1samples','merged_th2samples']]],
                 phsample = [['subject_id',
@@ -122,11 +118,9 @@ def tractography(args):
     datasource.inputs.field_template = dict(dwi='%s/dti/%s.nii.gz',
                                             bvecs='%s/dti/%s',
                                             bvals='%s/dti/%s',
-                                            seed_file='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            target_mask='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            exclusion_masks='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            FC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            TC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
                                             posterior_em='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            TC_em='%s/ROI/%s.nii.gz',
                                             matrix='%s/registration/%s',
                                             bet_mask='%s/dti/%s.nii.gz',
                                             thsample='%s/DTI.bedpostX/%s.nii.gz',
@@ -163,10 +157,8 @@ def tractography(args):
     bs_add_wm_add_ex = pe.Node(interface=fsl.MultiImageMaths(), name='add_posterior_plane')
     bs_add_wm_add_ex.inputs.op_string = '-add %s'
 
-    bs_add_wm_add_ex_add_tc = pe.Node(interface=fsl.MultiImageMaths(), name='add_temporal_lobe')
-    bs_add_wm_add_ex_add_tc.inputs.op_string = '-add %s'
     # Probabilistic tractography
-    probtrackx = pe.Node(interface=fsl.ProbTrackX2(), name='probtrackx_OFC')
+    probtrackx = pe.Node(interface=fsl.ProbTrackX2(), name='TC_FC_probtrackx')
     probtrackx.inputs.onewaycondition= True
     #Below are the default options
     #probtrackx.inputs.waycond = 'AND'
@@ -181,13 +173,13 @@ def tractography(args):
 
     # Data sink
     datasink = pe.Node(interface=nio.DataSink(),name='datasink')
-    datasink.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project/OFC_tractography_wm')
+    datasink.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project/TC_FC_tractography')
     datasink.inputs.substitutions = [('_variable', 'variable'),
                                      ('_subject_id_', 'subject_id')]
 
     # Workflow 
-    dwiproc = pe.Workflow(name="dwiproc_OFC")
-    dwiproc.base_dir = os.path.abspath('tractography_OFC_wm_pthalex')
+    dwiproc = pe.Workflow(name="TC_FC_tractography")
+    dwiproc.base_dir = os.path.abspath('TC_FC_tractography')
     dwiproc.connect([
                         (infosource,datasource,[('subject_id', 'subject_id')]),
                         (datasource, brainStemExtract, [('aseg', 'in_file')]),
@@ -196,13 +188,11 @@ def tractography(args):
                         (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
                         (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
                         (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
-                        (datasource, bs_add_wm_add_ex_add_tc, [('TC_em', 'operand_files')]),
-                        (bs_add_wm_add_ex, bs_add_wm_add_ex_add_tc, [('out_file', 'in_file')]),
-                        (bs_add_wm_add_ex_add_tc, probtrackx,[('out_file', 'avoid_mp')]),
-                        (bs_add_wm_add_ex_add_tc, datasink,[('out_file','exclusion_mask')]),
-                        (datasource,probtrackx,[('seed_file','seed'),
-                                                   ('target_mask','stop_mask'),
-                                                   ('target_mask','waypoints'),
+                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
+                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
+                        (datasource,probtrackx,[('TC','seed'),
+                                                   ('FC','stop_mask'),
+                                                   ('FC','waypoints'),
                                                    ('bet_mask','mask'),
                                                    ('phsample','phsamples'),
                                                    ('fsample','fsamples'),
@@ -220,23 +210,6 @@ def tractography(args):
     # Parallel processing
     dwiproc.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
 
-
-def get_opposite(roiList):
-    import os
-    if os.path.basename(roiList[0]).startswith('lh'):
-        newList = [x.replace('lh','rh') for x in roiList]
-        for i in roiList:
-            if not os.path.basename(i).startswith('lh_OFC'):
-                newList.append(i)
-        print [os.path.basename(x) for x in newList]
-
-    else:
-        newList = [x.replace('rh','lh') for x in roiList]
-        for i in roiList:
-            if not os.path.basename(i).startswith('rh_OFC'):
-                newList.append(i)
-        print newList
-    return newList
 
 def thal_TC_posterior(thalamusImg, TC_img):
     roiLoc = os.path.dirname(thalamusImg)

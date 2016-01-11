@@ -87,15 +87,12 @@ def tractography(args):
     info = dict(dwi=[['subject_id', 'data']],
                 bvecs=[['subject_id', 'bvecs']],
                 bvals=[['subject_id', 'bvals']],
-                THAL=[['subject_id', 'thalamus']],
-                LPFC=[['subject_id', 'LPFC']],
-                MPFC=[['subject_id', 'MPFC']],
-                OFC=[['subject_id', 'OFC']],
-                LTC=[['subject_id', 'LTC']],
-                MTC=[['subject_id', 'MTC']],
-                FC=[['subject_id', 'FC']],
-                TC=[['subject_id', 'TC']],
-                posterior_em = [['subject_id', 'post_thal_TC_excl_mask']],
+                SEED=[['subject_id', 
+                    ['LTC', 'MTC', 'TC']]],
+                STOP=[['subject_id', 
+                    ['LPFC', 'OFC',' MPFC', 'FC']]],
+                posterior_TC_em = [['subject_id', 'post_thal_TC_excl_mask']],
+                posterior_THAL_em = [['subject_id', 'post_thal_excl_mask']],
                 thsample = [['subject_id',
                     ['merged_th1samples','merged_th2samples']]],
                 phsample = [['subject_id',
@@ -124,15 +121,10 @@ def tractography(args):
     datasource.inputs.field_template = dict(dwi='%s/dti/%s.nii.gz',
                                             bvecs='%s/dti/%s',
                                             bvals='%s/dti/%s',
-                                            THAL='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            OFC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            LPFC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            MPFC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            LTC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            MTC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            FC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            TC='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            posterior_em='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            SEED='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            STOP='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            posterior_TC_em='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            posterior_THAL_em='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
                                             matrix='%s/registration/%s',
                                             bet_mask='%s/dti/%s.nii.gz',
                                             thsample='%s/DTI.bedpostX/%s.nii.gz',
@@ -170,8 +162,12 @@ def tractography(args):
     bs_add_wm_add_ex.inputs.op_string = '-add %s'
 
     # Probabilistic tractography
-    probtrackx = pe.Node(interface=fsl.ProbTrackX2(), name='TC_FC_probtrackx_detailed')
+    probtrackx = pe.MapNode(interface=fsl.ProbTrackX2(), 
+            name='TC_FC_probtrackx_detailed',
+            iterfield = ['seed', 'stop_mask', 'waypoints']
+            )
     probtrackx.inputs.onewaycondition= True
+
     #Below are the default options
     #probtrackx.inputs.waycond = 'AND'
     #probtrackx.inputs.c_thresh = 0.2
@@ -190,7 +186,7 @@ def tractography(args):
                                      ('_subject_id_', '')]
 
     # Workflow 
-    dwiproc = pe.Workflow(name="THAL_TC")
+    dwiproc = pe.Workflow(name="iterables_Mapnode")
     dwiproc.base_dir = os.path.abspath('tractography_thal_TC')
     dwiproc.connect([
                         (infosource,datasource,[('subject_id', 'subject_id')]),
@@ -202,9 +198,9 @@ def tractography(args):
                         (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
                         (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
                         (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
-                        (datasource,probtrackx,[('THAL','seed'),
-                                                   ('TC','stop_mask'),
-                                                   ('TC','waypoints'),
+                        (datasource,probtrackx,[('SEED','seed'),
+                                                   ('STOP','stop_mask'),
+                                                   ('STOP','waypoints'),
                                                    ('bet_mask','mask'),
                                                    ('phsample','phsamples'),
                                                    ('fsample','fsamples'),
@@ -221,75 +217,6 @@ def tractography(args):
 
     # Parallel processing
     dwiproc.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
-
-    dwiproc_thal_LTC = pe.Workflow(name="THAL_LTC")
-    dwiproc_thal_LTC.base_dir = os.path.abspath('tractography_thal_TC')
-    dwiproc_thal_LTC.connect([
-                        (infosource,datasource,[('subject_id', 'subject_id')]),
-                        (datasource, brainStemExtract, [('aseg', 'in_file')]),
-                        (datasource, wmExtract, [('aseg', 'in_file')]),
-                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
-                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
-                        (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
-                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
-                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
-                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
-                        (datasource,probtrackx,[('THAL','seed'),
-                                                   ('LTC','stop_mask'),
-                                                   ('LTC','waypoints'),
-                                                   ('bet_mask','mask'),
-                                                   ('phsample','phsamples'),
-                                                   ('fsample','fsamples'),
-                                                   ('thsample','thsamples'),
-                                                   ('matrix','xfm'),
-                                                   ]),
-                        (probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
-                            ('log', 'probtrackx.@log'),
-                            ('particle_files', 'probtrackx.@particle_files'),
-                            ('targets', 'probtrackx.@targets'),
-                            ('way_total', 'probtrackx.@way_total'),
-                            ])
-                    ])
-
-    # Parallel processing
-    dwiproc_thal_LTC.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
-
-
-    dwiproc_thal_MTC = pe.Workflow(name="THAL_MTC")
-    dwiproc_thal_MTC.base_dir = os.path.abspath('tractography_thal_TC')
-    dwiproc_thal_MTC.connect([
-                        (infosource,datasource,[('subject_id', 'subject_id')]),
-                        (datasource, brainStemExtract, [('aseg', 'in_file')]),
-                        (datasource, wmExtract, [('aseg', 'in_file')]),
-                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
-                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
-                        (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
-                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
-                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
-                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
-                        (datasource,probtrackx,[('THAL','seed'),
-                                                   ('MTC','stop_mask'),
-                                                   ('MTC','waypoints'),
-                                                   ('bet_mask','mask'),
-                                                   ('phsample','phsamples'),
-                                                   ('fsample','fsamples'),
-                                                   ('thsample','thsamples'),
-                                                   ('matrix','xfm'),
-                                                   ]),
-                        (probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
-                            ('log', 'probtrackx.@log'),
-                            ('particle_files', 'probtrackx.@particle_files'),
-                            ('targets', 'probtrackx.@targets'),
-                            ('way_total', 'probtrackx.@way_total'),
-                            ])
-                    ])
-
-    # Parallel processing
-    dwiproc_thal_MTC.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
-
-
-
-
 
 def thal_TC_posterior(thalamusImg, TC_img):
     roiLoc = os.path.dirname(thalamusImg)

@@ -32,11 +32,8 @@ def tractography(args):
         for side in ['lh', 'rh']:
             roiLoc = os.path.join(dataLoc, subject, 'ROI')
             thalamusROI = os.path.join(roiLoc, side+'_thalamus.nii.gz')
-            newROI = os.path.join(roiLoc,side+'_post_thal_excl_mask.nii.gz')
+            plan_exclusion_mask = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
                     
-            if not os.path.isfile(newROI):
-                thalamusPosterior(thalamusROI)
-
             regLoc = os.path.join(dataLoc, subject, 'registration')
             temporalExROI = 'MNI_temporal_mask.nii.gz'
             temporalExROI_sub = os.path.join(roiLoc, 'temporalExROI.nii.gz')
@@ -73,6 +70,8 @@ def tractography(args):
                             out_file = temporalExROI_sub)
                     TC_to_subj.run()
 
+            if not os.path.isfile(plan_exclusion_mask):
+                thal_TC_posterior(thalamusROI, temporalExROI_sub)
 
 
     # Dictionary for datasource
@@ -84,7 +83,7 @@ def tractography(args):
                 exclusion_masks=[['subject_id', 
                     ['LPFC', 'LTC', 'MPFC','MTC',
                      'OCC','OFC','PC','SMC']]],
-                posterior_em = [['subject_id', 'post_thal_excl_mask']],
+                posterior_em = [['subject_id', 'post_thal_TC_excl_mask']],
                 TC_em = [['subject_id', 'temporalExROI']],
                 thsample = [['subject_id',
                     ['merged_th1samples','merged_th2samples']]],
@@ -230,26 +229,41 @@ def get_opposite(roiList):
         print newList
     return newList
 
-def thalamusPosterior(thalamusImg):
+def thal_TC_posterior(thalamusImg, TC_img):
     roiLoc = os.path.dirname(thalamusImg)
     side = os.path.basename(thalamusImg)[:2]
 
 
     # ROI load
-    f = nb.load(thalamusImg)
-    data = f.get_data()
+    f_thal = nb.load(thalamusImg)
+    data_thal = f_thal.get_data()
+
+    f_TC = nb.load(TCamusImg)
+    data_TC = f_TC.get_data()
 
     # find lowest z coordinate
-    z_length = data.shape[2]
-    for sliceNum in range(z_length):
-        if 1 in data[:,:,sliceNum]:
+    z_length = data_thal.shape[2]
+    for sliceNumThal in range(z_length):
+        if 1 in data_thal[:,:,sliceNumThal]:
             break
 
-    newArray = np.zeros_like(data)
+    z_length = data_thal.shape[2]
+    for sliceNumTC in range(z_length):
+        if 1 in data_TC[:,:,sliceNumTC]:
+            break
+
+    # lower the slice number the posterior the plane
+    if sliceNumThal > sliceNumTC:
+        sliceNum = sliceNumTC
+    else:
+        sliceNum = sliceNumThal
+
+
+    newArray = np.zeros_like(data_thal)
     newArray[:,:,sliceNum] = 1
 
-    newROI = os.path.join(roiLoc,side+'_post_thal_excl_mask.nii.gz')
-    nb.Nifti1Image(newArray, f.affine).to_filename(newROI)
+    plan_exclusion_mask = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
+    nb.Nifti1Image(newArray, f_thal.affine).to_filename(plan_exclusion_mask)
 
 
 

@@ -90,7 +90,7 @@ def tractography(args):
                 SEED=[['subject_id', 
                     ['LTC', 'MTC', 'TC']]],
                 STOP=[['subject_id', 
-                    ['LPFC', 'OFC', 'MPFC', 'FC']]],
+                    ['LPFC', 'MPFC', 'FC']]],
                 posterior_TC_em = [['subject_id', 'post_thal_TC_excl_mask']],
                 posterior_THAL_em = [['subject_id', 'post_thal_excl_mask']],
                 thsample = [['subject_id',
@@ -181,13 +181,13 @@ def tractography(args):
 
     # Data sink
     datasink = pe.Node(interface=nio.DataSink(),name='datasink')
-    datasink.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project/tractography_thal_TC')
+    datasink.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project/tractography')
     datasink.inputs.substitutions = [('_variable', 'variable'),
                                      ('_subject_id_', '')]
 
     # Workflow 
     dwiproc = pe.Workflow(name="iterables_Mapnode")
-    dwiproc.base_dir = os.path.abspath('tractography_thal_TC')
+    dwiproc.base_dir = os.path.abspath('tractography')
     dwiproc.connect([
                         (infosource,datasource,[('subject_id', 'subject_id')]),
                         (datasource, brainStemExtract, [('aseg', 'in_file')]),

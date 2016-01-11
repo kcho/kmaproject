@@ -220,6 +220,167 @@ def tractography(args):
     # Parallel processing
     dwiproc.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
 
+    # Workflow 
+    dwiproc_LTC_OFC = pe.Workflow(name="TC_FC_tractography_LTC_OFC")
+    dwiproc_LTC_OFC.base_dir = os.path.abspath('TC_FC_tractography')
+    dwiproc_LTC_OFC.connect([
+                        (infosource,datasource,[('subject_id', 'subject_id')]),
+                        (datasource, brainStemExtract, [('aseg', 'in_file')]),
+                        (datasource, wmExtract, [('aseg', 'in_file')]),
+                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
+                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
+                        (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
+                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
+                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
+                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
+                        (datasource,probtrackx,[('LTC','seed'),
+                                                   ('OFC','stop_mask'),
+                                                   ('OFC','waypoints'),
+                                                   ('bet_mask','mask'),
+                                                   ('phsample','phsamples'),
+                                                   ('fsample','fsamples'),
+                                                   ('thsample','thsamples'),
+                                                   ('matrix','xfm'),
+                                                   ]),
+                        (probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
+                            ('log', 'probtrackx.@log'),
+                            ('particle_files', 'probtrackx.@particle_files'),
+                            ('targets', 'probtrackx.@targets'),
+                            ('way_total', 'probtrackx.@way_total'),
+                            ])
+                    ])
+    # Parallel processing
+    dwiproc_LTC_OFC.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
+
+
+    # Workflow 
+    dwiproc_LTC_MPFC = pe.Workflow(name="TC_FC_tractography_LTC_MPFC")
+    dwiproc_LTC_MPFC.base_dir = os.path.abspath('TC_FC_tractography')
+    dwiproc_LTC_MPFC.connect([
+                        (infosource,datasource,[('subject_id', 'subject_id')]),
+                        (datasource, brainStemExtract, [('aseg', 'in_file')]),
+                        (datasource, wmExtract, [('aseg', 'in_file')]),
+                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
+                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
+                        (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
+                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
+                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
+                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
+                        (datasource,probtrackx,[('LTC','seed'),
+                                                   ('MPFC','stop_mask'),
+                                                   ('MPFC','waypoints'),
+                                                   ('bet_mask','mask'),
+                                                   ('phsample','phsamples'),
+                                                   ('fsample','fsamples'),
+                                                   ('thsample','thsamples'),
+                                                   ('matrix','xfm'),
+                                                   ]),
+                        (probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
+                            ('log', 'probtrackx.@log'),
+                            ('particle_files', 'probtrackx.@particle_files'),
+                            ('targets', 'probtrackx.@targets'),
+                            ('way_total', 'probtrackx.@way_total'),
+                            ])
+                    ])
+
+    # Parallel processing
+    dwiproc_LTC_MPFC.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
+
+    # Workflow 
+    dwiproc_MTC_MPFC = pe.Workflow(name="TC_FC_tractography_MTC_MPFC")
+    dwiproc_MTC_MPFC.base_dir = os.path.abspath('TC_FC_tractography')
+    dwiproc_MTC_MPFC.connect([
+                        (infosource,datasource,[('subject_id', 'subject_id')]),
+                        (datasource, brainStemExtract, [('aseg', 'in_file')]),
+                        (datasource, wmExtract, [('aseg', 'in_file')]),
+                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
+                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
+                        (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
+                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
+                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
+                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
+                        (datasource,probtrackx,[('MTC','seed'),
+                                                   ('MPFC','stop_mask'),
+                                                   ('MPFC','waypoints'),
+                                                   ('bet_mask','mask'),
+                                                   ('phsample','phsamples'),
+                                                   ('fsample','fsamples'),
+                                                   ('thsample','thsamples'),
+                                                   ('matrix','xfm'),
+                                                   ]),
+                        (probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
+                            ('log', 'probtrackx.@log'),
+                            ('particle_files', 'probtrackx.@particle_files'),
+                            ('targets', 'probtrackx.@targets'),
+                            ('way_total', 'probtrackx.@way_total'),
+                            ])
+                    ])
+    # Parallel processing
+    dwiproc_MTC_MPFC.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
+
+    # Workflow 
+    dwiproc_MTC_LPFC = pe.Workflow(name="TC_FC_tractography_MTC_LPFC")
+    dwiproc_MTC_LPFC.base_dir = os.path.abspath('TC_FC_tractography')
+    dwiproc_MTC_LPFC.connect([
+                        (infosource,datasource,[('subject_id', 'subject_id')]),
+                        (datasource, brainStemExtract, [('aseg', 'in_file')]),
+                        (datasource, wmExtract, [('aseg', 'in_file')]),
+                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
+                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
+                        (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
+                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
+                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
+                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
+                        (datasource,probtrackx,[('MTC','seed'),
+                                                   ('LPFC','stop_mask'),
+                                                   ('LPFC','waypoints'),
+                                                   ('bet_mask','mask'),
+                                                   ('phsample','phsamples'),
+                                                   ('fsample','fsamples'),
+                                                   ('thsample','thsamples'),
+                                                   ('matrix','xfm'),
+                                                   ]),
+                        (probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
+                            ('log', 'probtrackx.@log'),
+                            ('particle_files', 'probtrackx.@particle_files'),
+                            ('targets', 'probtrackx.@targets'),
+                            ('way_total', 'probtrackx.@way_total'),
+                            ])
+                    ])
+    # Parallel processing
+    dwiproc_MTC_LPFC.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
+
+    # Workflow 
+    dwiproc_MTC_OFC = pe.Workflow(name="TC_FC_tractography_MTC_OFC")
+    dwiproc_MTC_OFC.base_dir = os.path.abspath('TC_FC_tractography')
+    dwiproc_MTC_OFC.connect([
+                        (infosource,datasource,[('subject_id', 'subject_id')]),
+                        (datasource, brainStemExtract, [('aseg', 'in_file')]),
+                        (datasource, wmExtract, [('aseg', 'in_file')]),
+                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
+                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
+                        (datasource, bs_add_wm_add_ex, [('posterior_em', 'operand_files')]),
+                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
+                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
+                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
+                        (datasource,probtrackx,[('MTC','seed'),
+                                                   ('OFC','stop_mask'),
+                                                   ('OFC','waypoints'),
+                                                   ('bet_mask','mask'),
+                                                   ('phsample','phsamples'),
+                                                   ('fsample','fsamples'),
+                                                   ('thsample','thsamples'),
+                                                   ('matrix','xfm'),
+                                                   ]),
+                        (probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
+                            ('log', 'probtrackx.@log'),
+                            ('particle_files', 'probtrackx.@particle_files'),
+                            ('targets', 'probtrackx.@targets'),
+                            ('way_total', 'probtrackx.@way_total'),
+                            ])
+                    ])
+    # Parallel processing
+    dwiproc_MTC_OFC.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
 
 def thal_TC_posterior(thalamusImg, TC_img):
     roiLoc = os.path.dirname(thalamusImg)

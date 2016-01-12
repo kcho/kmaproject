@@ -188,7 +188,7 @@ def tractography(args):
 
     # Workflow 
     dwiproc = pe.Workflow(name="Thal_TC_FC")
-    dwiproc.base_dir = os.path.abspath('tractography')
+    dwiproc.base_dir = os.path.abspath('Processing')
     dwiproc.connect([
                         (infosource,datasource,[('subject_id', 'subject_id')]),
                         (datasource, brainStemExtract, [('aseg', 'in_file')]),

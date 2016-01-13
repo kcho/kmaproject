@@ -57,7 +57,7 @@ def tractography(args):
             get_mask_from_fs(aseg_img, brainStem)
 
         wm_mask =  os.path.join(roiLoc, 'lh_wm_mask.nii.gz')
-        if not os.path.isfile():
+        if not os.path.isfile(wm_mask):
             get_mask_from_fs(aseg_img, wm_mask)
 
         wm_mask =  os.path.join(roiLoc, 'rh_wm_mask.nii.gz')
@@ -81,6 +81,7 @@ def tractography(args):
             wm_mask =  os.path.join(roiLoc, side+'_wm_mask.nii.gz')
             contra_wm = re.sub(side, get_opposite(side), wm_mask)
             MNI_TC_mask_reg = os.path.join(roiLoc, side+'_MNI_TC_mask.nii.gz')
+            MNI_OCC_mask_reg = os.path.join(roiLoc, side+'_MNI_OCC_mask.nii.gz')
 
             # merged exclusion_masks
             TC_thal_ex_mask = os.path.join(roiLoc, side+'_TC_thal_ex_mask.nii.gz')
@@ -88,8 +89,10 @@ def tractography(args):
             FC_TC_ex_mask = os.path.join(roiLoc, side+'_FC_TC_ex_mask.nii.gz')
 
             if not os.path.isfile(MNI_TC_mask_reg):
-                get_MNI_TC_mask_reg(dataLoc, subject, MNI_TC_mask_reg)
+                get_MNI_mask_reg(dataLoc, subject, MNI_TC_mask_reg)
 
+            if not os.path.isfile(MNI_OCC_mask_reg):
+                get_MNI_mask_reg(dataLoc, subject, MNI_OCC_mask_reg)
 
             if not os.path.isfile(TC_ROI):
                 add_files(LTC, [MTC], TC_ROI)
@@ -98,28 +101,30 @@ def tractography(args):
                 add_files(LPFC, [MPFC, OFC], FC_ROI)
 
             if not os.path.isfile(post_thal_plane):
-                thal_TC_posterior(thalamusROI, thalamusROI)
+                thal_TC_posterior(thalamusROI, thalamusROI, post_thal_plane)
 
             if not os.path.isfile(post_TC_plane):
-                thal_TC_posterior(thalamusROI, TC_ROI)
+                thal_TC_posterior(thalamusROI, TC_ROI, post_TC_plane)
 
             if not os.path.isfile(ant_thal_ex_mask):
                 thal_anterior(thalamusROI, wm_mask, 
                         ant_thal_ex_mask, MNI_TC_mask_reg)
 
+
+            # Exclusion masks
             if not os.path.isfile(TC_thal_ex_mask):
                 add_files(brainStem,
-                        [contra_wm, brainStem, ant_thal_ex_mask, post_TC_plane],
+                        [contra_wm, ant_thal_ex_mask, post_TC_plane, MNI_OCC_mask_reg ],
                         TC_thal_ex_mask)
 
             if not os.path.isfile(FC_thal_ex_mask):
                 add_files(brainStem,
-                        [contra_wm, brainStem, post_thal_plane],
+                        [contra_wm, post_thal_plane, MNI_TC_mask_reg, MNI_OCC_mask_reg],
                         FC_thal_ex_mask)
         
             if not os.path.isfile(FC_TC_ex_mask):
                 add_files(brainStem,
-                        [contra_wm, brainStem, post_TC_plane],
+                        [contra_wm, post_TC_plane, MNI_OCC_mask_reg],
                         FC_TC_ex_mask)
 
     # Dictionary for datasource
@@ -234,7 +239,7 @@ def tractography(args):
     dwiproc.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
 
 
-def thal_TC_posterior(thalamusImg, TC_img=None):
+def thal_TC_posterior(thalamusImg, TC_img, outFile):
     roiLoc = os.path.dirname(thalamusImg)
     side = os.path.basename(thalamusImg)[:2]
 
@@ -265,17 +270,22 @@ def thal_TC_posterior(thalamusImg, TC_img=None):
     newArray = np.zeros_like(data_thal)
     newArray[:,:,sliceNum] = 1
 
-    post_thal_plane = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
-    nb.Nifti1Image(newArray, f_thal.affine).to_filename(post_thal_plane)
+    nb.Nifti1Image(newArray, f_thal.affine).to_filename(outFile)
 
 
-def get_MNI_TC_mask_reg(dataLoc, subject, MNI_TC_mask_reg):
+def get_MNI_mask_reg(dataLoc, subject, outROI):
     MNI_TC_mask = 'MNI_temporal_mask.nii.gz'
     roiLoc = os.path.join(dataLoc, subject, 'ROI')
     mni2subj = os.path.join(roiLoc, 'mni2subj.mat')
     subjBrain = os.path.join(dataLoc, subject, 'FREESURFER',
                         'mri','brain.nii.gz')
     atlasLoc = '/usr/local/fsl/data/atlases/MNI/MNI-maxprob-thr0-1mm.nii.gz'
+
+    if outROI.endswith('TC_mask.nii.gz'):
+        op_string = '-thr 8 -uthr 8'
+    elif outROI.endswith('OCC_mask.nii.gz'):
+        op_string = '-thr 5 -uthr 5'
+
 
     # Registration
     if not os.path.isfile(mni2subj):
@@ -284,13 +294,14 @@ def get_MNI_TC_mask_reg(dataLoc, subject, MNI_TC_mask_reg):
                 reference = subjBrain,
                 interp = 'nearestneighbour',
                 out_matrix_file = mni2subj)
+        print 'MNI <--> subject flirt is running'
         MNIreg.run()
 
     # ROI extraction
     if not os.path.isfile(MNI_TC_mask):
         extractTC = fsl.ImageMaths(
                 in_file = atlasLoc,
-                op_string = '-thr 8 -uthr 8',
+                op_string = op_string,
                 out_file = MNI_TC_mask,
                 )
         extractTC.run()
@@ -301,7 +312,7 @@ def get_MNI_TC_mask_reg(dataLoc, subject, MNI_TC_mask_reg):
             reference = subjBrain,
             interp = 'nearestneighbour',
             in_matrix_file = mni2subj,
-            out_file = MNI_TC_mask_reg)
+            out_file = outROI)
     TC_to_subj.run()
 
 def thal_anterior(thalamusROI, wm_mask, ant_thal_ex_mask, MNI_TC_mask_reg):
@@ -341,11 +352,11 @@ def get_opposite(side):
 
 def get_mask_from_fs(aseg_img, binaryROI):
     if binaryROI.endswith('brain_stem.nii.gz'):
-        match = [16, 6, 7, 8, 45, 46, 47],
+        match = [16, 6, 7, 8, 45, 46, 47]
     elif binaryROI.endswith('lh_wm_mask.nii.gz'):
-        wmExtract.inputs.match = [2]
+        match = [2]
     elif binaryROI.endswith('rh_wm_mask.nii.gz'):
-        wmExtract.inputs.match = [41]
+        match = [41]
 
     binarize = fs.Binarize(out_type='nii.gz',
             match = match,
@@ -358,7 +369,7 @@ def add_files(in_file, in_file2, out_file):
     merge = fsl.MultiImageMaths(
             in_file = in_file,
             operand_files = in_file2,
-            op_string = op_string
+            op_string = op_string,
             out_file = out_file,
             )
     merge.run()

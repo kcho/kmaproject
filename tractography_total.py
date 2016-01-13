@@ -41,6 +41,7 @@ def tractography(args):
     - Cerebellum 
     - A coronal plane posterior to the temporal cortex
     '''
+
     dataLoc = '/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project'
     subject_list = args.subjects
 
@@ -60,6 +61,13 @@ def tractography(args):
             FC_ROI = os.path.join(roiLoc, side+'_FC.nii.gz')
 
             plan_exclusion_mask = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
+            ant_thal_ex_mask =  os.path.join(roiLoc, side+'_ant_thal_excl_mask.nii.gz')
+            wm_mask =  os.path.join(roiLoc, side+'_wm_mask.nii.gz')
+            MNI_TC_mask_reg = os.path.join(roiLoc, side+'_MNI_TC_mask.nii.gz')
+            aseg_img = os.path.join(dataLoc, subject, 'FREESURFER/mri/aseg.mgz')
+
+            if not os.path.isfile(MNI_TC_mask_reg):
+                get_MNI_TC_mask_reg(dataLoc, subject, MNI_TC_mask_reg)
 
             if not os.path.isfile(TC_ROI):
                 merge_LTC_MTC = fsl.MultiImageMaths(
@@ -82,6 +90,21 @@ def tractography(args):
 
             if not os.path.isfile(plan_exclusion_mask):
                 thal_TC_posterior(thalamusROI, TC_ROI)
+
+            if not os.path.isfile(ant_thal_ex_mask):
+                if not os.path.isfile(wm_mask):
+                    wmExtract = fs.Binarize(out_type='nii.gz',
+                            in_file = aseg_img,
+                            binary_file = wm_mask)
+                    if args.side == 'lh':
+                        # needs to put the contralateral hemisphere
+                        wmExtract.inputs.match = [41]
+                    else:
+                        wmExtract.inputs.match = [2]
+                    wmExtract.run()
+
+                thal_anterior(thalamusROI, wm_mask, 
+                        ant_thal_ex_mask, MNI_TC_mask_reg)
 
 
     # Dictionary for datasource
@@ -254,6 +277,70 @@ def thal_TC_posterior(thalamusImg, TC_img):
 
     plan_exclusion_mask = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
     nb.Nifti1Image(newArray, f_thal.affine).to_filename(plan_exclusion_mask)
+
+
+def get_MNI_TC_mask_reg(dataLoc, subject, MNI_TC_mask_reg):
+    MNI_TC_mask = 'MNI_temporal_mask.nii.gz'
+    roiLoc = os.path.join(dataLoc, subject, 'ROI')
+    mni2subj = os.path.join(roiLoc, 'mni2subj.mat')
+    subjBrain = os.path.join(dataLoc, subject, 'FREESURFER',
+                        'mri','brain.nii.gz')
+    atlasLoc = '/usr/local/fsl/data/atlases/MNI/MNI-maxprob-thr0-1mm.nii.gz'
+
+    # Registration
+    if not os.path.isfile(mni2subj):
+        MNIreg = fsl.FLIRT(
+                in_file = atlasLoc,
+                reference = subjBrain,
+                interp = 'nearestneighbour',
+                out_matrix_file = mni2subj)
+        MNIreg.run()
+
+    # ROI extraction
+    if not os.path.isfile(MNI_TC_mask):
+        extractTC = fsl.ImageMaths(
+                in_file = atlasLoc,
+                op_string = '-thr 8 -uthr 8',
+                out_file = MNI_TC_mask,
+                )
+        extractTC.run()
+
+    # Apply registration
+    TC_to_subj = fsl.ApplyXfm(
+            in_file = MNI_TC_mask,
+            reference = subjBrain,
+            interp = 'nearestneighbour',
+            in_matrix_file = mni2subj,
+            out_file = MNI_TC_mask_reg)
+    TC_to_subj.run()
+
+def thal_anterior(thalamusROI, wm_mask, ant_thal_ex_mask, MNI_TC_mask_reg):
+    roiLoc = os.path.dirname(thalamusROI)
+    side = os.path.basename(thalamusROI)[:2]
+
+    # ROI load
+    f_thal = nb.load(thalamusROI)
+    data_thal = f_thal.get_data()
+
+    f_WM = nb.load(wm_mask)
+    data_WM = f_WM.get_data()
+
+    f_TC = nb.load(MNI_TC_mask_reg)
+    data_TC = f_TC.get_data()
+
+    # find highest z coordinate
+    z_length = data_thal.shape[2]
+    for sliceNumThal in range(z_length, 0, -1):
+        if 1 in data_thal[:,:,sliceNumThal-1]:
+            break
+
+    # Zeroing the white matter mask posterior to the plane
+    data_WM[:,:,:sliceNumThal] = 0
+    data_WM_sub_TC = data_WM - data_TC
+    data_WM_sub_TC[ data_WM_sub_TC < 0] = 0
+
+
+    nb.Nifti1Image(data_WM_sub_TC, f_WM.affine).to_filename(ant_thal_ex_mask)
 
 
 

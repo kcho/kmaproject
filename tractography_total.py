@@ -48,8 +48,18 @@ def tractography(args):
     # Make exclusion mask in order to exclude tracks
     # going towards posterior paths from the thalamus
     for subject in subject_list:
+        roiLoc = os.path.join(dataLoc, subject, 'ROI')
+        aseg_img = os.path.join(dataLoc, subject, 'FREESURFER/mri/aseg.mgz')
+
+        brainStem = os.path.join(roiLoc, 'brain_stem.nii.gz')
+        if not os.path.isfile(brainStem):
+            brainStemExtract = fs.Binarize(out_type='nii.gz',
+                    match = [16, 6, 7, 8, 45, 46, 47],
+                    binary_file = brainStem,
+                    aseg = aseg_img)
+            brainStemExtract.run()
+
         for side in ['lh', 'rh']:
-            roiLoc = os.path.join(dataLoc, subject, 'ROI')
             thalamusROI = os.path.join(roiLoc, side+'_thalamus.nii.gz')
             LTC = os.path.join(roiLoc, side+'_LTC.nii.gz')
             MTC = os.path.join(roiLoc, side+'_MTC.nii.gz')
@@ -60,11 +70,11 @@ def tractography(args):
             MPFC = os.path.join(roiLoc, side+'_MPFC.nii.gz')
             FC_ROI = os.path.join(roiLoc, side+'_FC.nii.gz')
 
-            plan_exclusion_mask = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
+            post_TC_plane= os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
+            post_thal_plane = os.path.join(roiLoc,side+'_post_thal_excl_mask.nii.gz')
             ant_thal_ex_mask =  os.path.join(roiLoc, side+'_ant_thal_excl_mask.nii.gz')
             wm_mask =  os.path.join(roiLoc, side+'_wm_mask.nii.gz')
             MNI_TC_mask_reg = os.path.join(roiLoc, side+'_MNI_TC_mask.nii.gz')
-            aseg_img = os.path.join(dataLoc, subject, 'FREESURFER/mri/aseg.mgz')
 
             if not os.path.isfile(MNI_TC_mask_reg):
                 get_MNI_TC_mask_reg(dataLoc, subject, MNI_TC_mask_reg)
@@ -88,7 +98,10 @@ def tractography(args):
                 merge_LPFC_MPFC_OFC.run()
 
 
-            if not os.path.isfile(plan_exclusion_mask):
+            if not os.path.isfile(post_thal_plane):
+                thal_TC_posterior(thalamusROI, thalamusROI)
+
+            if not os.path.isfile(post_TC_plane):
                 thal_TC_posterior(thalamusROI, TC_ROI)
 
             if not os.path.isfile(ant_thal_ex_mask):
@@ -112,11 +125,19 @@ def tractography(args):
                 bvecs=[['subject_id', 'bvecs']],
                 bvals=[['subject_id', 'bvals']],
                 SEED=[['subject_id', 
-                    ['THAL', 'THAL','TC']]],
+                    ['THAL', 
+                     'THAL',
+                     'TC']]],
                 STOP=[['subject_id', 
-                    ['FC',   'TC',  'FC']]],
-                posterior_TC_em = [['subject_id', 'post_thal_TC_excl_mask']],
-                posterior_THAL_em = [['subject_id', 'post_thal_excl_mask']],
+                    ['FC',
+                     'TC',
+                     'FC']]],
+                avoid_mask = [['subject_id', 
+                    ['post_thal_excl_mask',
+                     'ant_thal_excl_mask',
+                     'post_thal_TC_excl_mask' ]]],
+                contra_wm = [['subject_id', 'wm_mask']],
+                brainStem = [['subject_id', 'brain_stem']],
                 thsample = [['subject_id',
                     ['merged_th1samples','merged_th2samples']]],
                 phsample = [['subject_id',
@@ -147,8 +168,9 @@ def tractography(args):
                                             bvals='%s/dti/%s',
                                             SEED='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
                                             STOP='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            posterior_TC_em='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            posterior_THAL_em='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            avoid_mask='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            contra_wm='%s/ROI/{side}_%s.nii.gz'.format(side=get_opposite(airgs.side)),
+                                            brainStem='%s/ROI/%s.nii.gz',
                                             matrix='%s/registration/%s',
                                             bet_mask='%s/dti/%s.nii.gz',
                                             thsample='%s/DTI.bedpostX/%s.nii.gz',
@@ -161,17 +183,7 @@ def tractography(args):
     datasource.inputs.template_args = info
     datasource.inputs.sort_filelist = True
 
-    brainStemExtract = pe.Node(interface=fs.Binarize(out_type='nii.gz'), name='brainStem')
-    brainStemExtract.inputs.match = [16, 6, 7, 8, 45, 46, 47]
 
-    wmExtract = pe.Node(interface=fs.Binarize(out_type='nii.gz'), name='wmExtract')
-    #    2   Left-Cerebral-White-Matter              245 245 245 0
-    #    41  Right-Cerebral-White-Matter             0   225 0   0
-    if args.side == 'lh':
-        # needs to put the contralateral hemisphere
-        wmExtract.inputs.match = [41]
-    else:
-        wmExtract.inputs.match = [2]
 
     
     # Merge exclusion ROIs
@@ -179,11 +191,13 @@ def tractography(args):
     # - contralateral hemisphere white matter 
     # - slice posterior to the thalamus 
     # - temporal lobe
-    bs_add_wm = pe.Node(interface=fsl.MultiImageMaths(), name='add_wm')
-    bs_add_wm.inputs.op_string = '-add %s'
+    brainstem_plane = pe.MapNode(interface=fsl.ImageMaths(),
+            name='brainstem_add_plane',
+            iterfield = ['in_file2'])
+    brainstem_plane.inputs.op_string = '-add %s'
 
-    bs_add_wm_add_ex = pe.Node(interface=fsl.MultiImageMaths(), name='add_posterior_plane')
-    bs_add_wm_add_ex.inputs.op_string = '-add %s'
+    brainstem_plane_wm = pe.Node(interface=fsl.MultiImageMaths(), name='brainstem_add_plane_add_wm')
+    brainstem_plane_wm.inputs.op_string = '-add %s'
 
     # Probabilistic tractography
     probtrackx = pe.MapNode(interface=fsl.ProbTrackX2(), 
@@ -214,14 +228,12 @@ def tractography(args):
     dwiproc.base_dir = os.path.abspath('Processing')
     dwiproc.connect([
                         (infosource,datasource,[('subject_id', 'subject_id')]),
-                        (datasource, brainStemExtract, [('aseg', 'in_file')]),
-                        (datasource, wmExtract, [('aseg', 'in_file')]),
-                        (brainStemExtract, bs_add_wm,[('binary_file', 'in_file')]),
-                        (wmExtract, bs_add_wm,[('binary_file', 'operand_files')]),
-                        (datasource, bs_add_wm_add_ex, [('posterior_TC_em', 'operand_files')]),
-                        (bs_add_wm, bs_add_wm_add_ex, [('out_file', 'in_file')]),
-                        (bs_add_wm_add_ex, probtrackx,[('out_file', 'avoid_mp')]),
-                        (bs_add_wm_add_ex, datasink,[('out_file','exclusion_mask')]),
+                        (datasource, brainstem_plane,[('brainStem', 'in_file')]),
+                        (datasource, brainstem_plane,[('avoid_mask', 'in_file2')]),
+                        (brainstem_plane, brainstem_plane_wm,[('out_file', 'in_file2')]),
+                        (datasource, brainstem_plane_wm,[('wm_mask', 'in_file2')]),
+                        (brainstem_plane_wm, datasink,[('out_file','exclusion_mask')]),
+                        (brainstem_plane_wm, probtrackx,[('out_file', 'avoid_mp')]),
                         (datasource,probtrackx,[('SEED','seed'),
                                                    ('STOP','stop_mask'),
                                                    ('STOP','waypoints'),
@@ -242,10 +254,10 @@ def tractography(args):
     # Parallel processing
     dwiproc.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
 
-def thal_TC_posterior(thalamusImg, TC_img):
+
+def thal_TC_posterior(thalamusImg, TC_img=None):
     roiLoc = os.path.dirname(thalamusImg)
     side = os.path.basename(thalamusImg)[:2]
-
 
     # ROI load
     f_thal = nb.load(thalamusImg)
@@ -271,12 +283,11 @@ def thal_TC_posterior(thalamusImg, TC_img):
     else:
         sliceNum = sliceNumThal
 
-
     newArray = np.zeros_like(data_thal)
     newArray[:,:,sliceNum] = 1
 
-    plan_exclusion_mask = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
-    nb.Nifti1Image(newArray, f_thal.affine).to_filename(plan_exclusion_mask)
+    post_thal_plane = os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
+    nb.Nifti1Image(newArray, f_thal.affine).to_filename(post_thal_plane)
 
 
 def get_MNI_TC_mask_reg(dataLoc, subject, MNI_TC_mask_reg):
@@ -343,6 +354,11 @@ def thal_anterior(thalamusROI, wm_mask, ant_thal_ex_mask, MNI_TC_mask_reg):
     nb.Nifti1Image(data_WM_sub_TC, f_WM.affine).to_filename(ant_thal_ex_mask)
 
 
+def get_opposite(side):
+    if side=='lh':
+        return 'rh'
+    else:
+        return 'lh'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

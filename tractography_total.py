@@ -91,8 +91,6 @@ def tractography(args):
             for fsMask in [fs_FC_wm, fs_TC_wm, fs_PC_wm, fs_OCC_wm]:
                 if not os.path.isfile(fsMask):
                     get_mask_from_fs(wmparc_img, fsMask)
-                if os.path.isfile(fsMask):
-                    get_mask_from_fs(wmparc_img, fsMask)
 
             # Merged exclusion_masks
             TC_thal_ex_mask = os.path.join(roiLoc, side+'_TC_thal_ex_mask.nii.gz')
@@ -123,20 +121,20 @@ def tractography(args):
 
 
             # Exclusion masks
-            if not os.path.isfile(TC_thal_ex_mask):
-                add_files(brainStem,
-                        [contra_wm, ant_thal_ex_mask, post_TC_plane, MNI_OCC_mask_reg ],
-                        TC_thal_ex_mask)
+            #if not os.path.isfile(TC_thal_ex_mask):
+            add_files(brainStem,
+                    [contra_wm, ant_thal_ex_mask, post_TC_plane, fs_OCC_wm, fs_PC_wm],
+                    TC_thal_ex_mask)
 
-            if not os.path.isfile(FC_thal_ex_mask):
-                add_files(brainStem,
-                        [contra_wm, post_thal_plane, MNI_TC_mask_reg, MNI_OCC_mask_reg],
-                        FC_thal_ex_mask)
-        
-            if not os.path.isfile(FC_TC_ex_mask):
-                add_files(brainStem,
-                        [contra_wm, post_TC_plane, MNI_OCC_mask_reg],
-                        FC_TC_ex_mask)
+            #if not os.path.isfile(FC_thal_ex_mask):
+            add_files(brainStem,
+                    [contra_wm, post_thal_plane, fs_TC_wm, fs_OCC_wm, fs_PC_wm],
+                    FC_thal_ex_mask)
+    
+            #if not os.path.isfile(FC_TC_ex_mask):
+            add_files(brainStem,
+                    [contra_wm, post_TC_plane, MNI_OCC_mask_reg, fs_OCC_wm, fs_PC_wm],
+                    FC_TC_ex_mask)
 
     # Dictionary for datasource
     info = dict(dwi=[['subject_id', 'data']],

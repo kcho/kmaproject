@@ -80,8 +80,8 @@ def tractography(args):
             ant_thal_ex_mask =  os.path.join(roiLoc, side+'_ant_thal_excl_mask.nii.gz')
             wm_mask =  os.path.join(roiLoc, side+'_wm_mask.nii.gz')
             contra_wm = re.sub(side, get_opposite(side), wm_mask)
-            MNI_TC_mask_reg = os.path.join(roiLoc, side+'_MNI_TC_mask.nii.gz')
-            MNI_OCC_mask_reg = os.path.join(roiLoc, side+'_MNI_OCC_mask.nii.gz')
+            MNI_TC_mask_reg = os.path.join(roiLoc, 'MNI_TC_mask.nii.gz')
+            MNI_OCC_mask_reg = os.path.join(roiLoc, 'MNI_OCC_mask.nii.gz')
 
             # merged exclusion_masks
             TC_thal_ex_mask = os.path.join(roiLoc, side+'_TC_thal_ex_mask.nii.gz')
@@ -274,7 +274,7 @@ def thal_TC_posterior(thalamusImg, TC_img, outFile):
 
 
 def get_MNI_mask_reg(dataLoc, subject, outROI):
-    MNI_TC_mask = 'MNI_temporal_mask.nii.gz'
+    MNI_mask = os.path.basename(outROI)[3:]
     roiLoc = os.path.join(dataLoc, subject, 'ROI')
     mni2subj = os.path.join(roiLoc, 'mni2subj.mat')
     subjBrain = os.path.join(dataLoc, subject, 'FREESURFER',
@@ -285,6 +285,12 @@ def get_MNI_mask_reg(dataLoc, subject, outROI):
         op_string = '-thr 8 -uthr 8'
     elif outROI.endswith('OCC_mask.nii.gz'):
         op_string = '-thr 5 -uthr 5'
+
+    print outROI, op_string
+    print outROI, op_string
+    print outROI, op_string
+    print outROI, op_string
+    print outROI, op_string
 
 
     # Registration
@@ -298,17 +304,17 @@ def get_MNI_mask_reg(dataLoc, subject, outROI):
         MNIreg.run()
 
     # ROI extraction
-    if not os.path.isfile(MNI_TC_mask):
+    if not os.path.isfile(MNI_mask):
         extractTC = fsl.ImageMaths(
                 in_file = atlasLoc,
                 op_string = op_string,
-                out_file = MNI_TC_mask,
+                out_file = MNI_mask,
                 )
         extractTC.run()
 
     # Apply registration
     TC_to_subj = fsl.ApplyXfm(
-            in_file = MNI_TC_mask,
+            in_file = MNI_mask,
             reference = subjBrain,
             interp = 'nearestneighbour',
             in_matrix_file = mni2subj,
@@ -372,6 +378,7 @@ def add_files(in_file, in_file2, out_file):
             op_string = op_string,
             out_file = out_file,
             )
+    print merge.cmdline
     merge.run()
 
 if __name__ == '__main__':

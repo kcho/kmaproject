@@ -51,6 +51,8 @@ def tractography(args):
     for subject in subject_list:
         roiLoc = os.path.join(dataLoc, subject, 'ROI')
         aseg_img = os.path.join(dataLoc, subject, 'FREESURFER/mri/aseg.mgz')
+        MNI_TC_mask_reg = os.path.join(roiLoc, 'MNI_TC_mask.nii.gz')
+        MNI_OCC_mask_reg = os.path.join(roiLoc, 'MNI_OCC_mask.nii.gz')
 
         brainStem = os.path.join(roiLoc, 'brain_stem.nii.gz')
         if not os.path.isfile(brainStem):
@@ -78,12 +80,21 @@ def tractography(args):
             post_TC_plane= os.path.join(roiLoc,side+'_post_thal_TC_excl_mask.nii.gz')
             post_thal_plane = os.path.join(roiLoc,side+'_post_thal_excl_mask.nii.gz')
             ant_thal_ex_mask =  os.path.join(roiLoc, side+'_ant_thal_excl_mask.nii.gz')
+
+            # Freesurfer exclusion mask
             wm_mask =  os.path.join(roiLoc, side+'_wm_mask.nii.gz')
             contra_wm = re.sub(side, get_opposite(side), wm_mask)
-            MNI_TC_mask_reg = os.path.join(roiLoc, 'MNI_TC_mask.nii.gz')
-            MNI_OCC_mask_reg = os.path.join(roiLoc, 'MNI_OCC_mask.nii.gz')
+            fs_FC_wm = os.path.join(roiLoc, side+'_fs_FC_wm.nii.gz')
+            fs_TC_wm = os.path.join(roiLoc, side+'_fs_TC_wm.nii.gz')
+            fs_PC_wm = os.path.join(roiLoc, side+'_fs_PC_wm.nii.gz')
+            fs_OCC_wm = os.path.join(roiLoc, side+'_fs_OCC_wm.nii.gz')
 
-            # merged exclusion_masks
+
+            for fsMask in [fs_FC_wm, fs_TC_wm, fs_PC_wm, fs_OCC_wm]:
+                if not os.path.isfile(fsMask):
+                    get_mask_from_fs(aseg_img, fsMask)
+
+            # Merged exclusion_masks
             TC_thal_ex_mask = os.path.join(roiLoc, side+'_TC_thal_ex_mask.nii.gz')
             FC_thal_ex_mask = os.path.join(roiLoc, side+'_FC_thal_ex_mask.nii.gz')
             FC_TC_ex_mask = os.path.join(roiLoc, side+'_FC_TC_ex_mask.nii.gz')
@@ -287,10 +298,6 @@ def get_MNI_mask_reg(dataLoc, subject, outROI):
         op_string = '-thr 5 -uthr 5'
 
     print outROI, op_string
-    print outROI, op_string
-    print outROI, op_string
-    print outROI, op_string
-    print outROI, op_string
 
 
     # Registration
@@ -363,6 +370,30 @@ def get_mask_from_fs(aseg_img, binaryROI):
         match = [2]
     elif binaryROI.endswith('rh_wm_mask.nii.gz'):
         match = [41]
+    elif binaryROI.endswith('lh_fs_FC_wm.nii.gz'):
+        match = [3002, 3026, 3028, 3020, 3027, 3032, 3018, 3019, 3014, 3012]
+    elif binaryROI.endswith('rh_fs_FC_wm.nii.gz'):
+        match = [4002, 4026, 4028, 4020, 4027, 4032, 4018, 4019, 4014, 4012]
+
+    elif binaryROI.endswith('lh_fs_FC_wm.nii.gz'):
+        match = [3002, 3026, 3028, 3020, 3027, 3032, 3018, 3019, 3014, 3012]
+    elif binaryROI.endswith('rh_fs_FC_wm.nii.gz'):
+        match = [4002, 4026, 4028, 4020, 4027, 4032, 4018, 4019, 4014, 4012]
+
+    elif binaryROI.endswith('lh_fs_TC_wm.nii.gz'):
+        match = [3034, 3030, 3001, 3009, 3015, 3033, 3006, 3016, 3007]
+    elif binaryROI.endswith('rh_fs_TC_wm.nii.gz'):
+        match = [4034, 4030, 4001, 4009, 4015, 4033, 4006, 4016, 4007]
+
+    elif binaryROI.endswith('lh_fs_PC_wm.nii.gz'):
+        match = [3008, 3031, 3025, 3023, 3010, 3029]
+    elif binaryROI.endswith('rh_fs_PC_wm.nii.gz'):
+        match = [4008, 4031, 4025, 4023, 4010, 4029]
+
+    elif binaryROI.endswith('lh_fs_OCC_wm.nii.gz'):
+        match = [3021, 3013, 3011, 3005]
+    elif binaryROI.endswith('rh_fs_OCC_wm.nii.gz'):
+        match = [4021, 4013, 4011, 4005]
 
     binarize = fs.Binarize(out_type='nii.gz',
             match = match,

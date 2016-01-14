@@ -51,6 +51,7 @@ def tractography(args):
     for subject in subject_list:
         roiLoc = os.path.join(dataLoc, subject, 'ROI')
         aseg_img = os.path.join(dataLoc, subject, 'FREESURFER/mri/aseg.mgz')
+        wmparc_img= os.path.join(dataLoc, subject, 'FREESURFER/mri/wmparc.mgz')
         MNI_TC_mask_reg = os.path.join(roiLoc, 'MNI_TC_mask.nii.gz')
         MNI_OCC_mask_reg = os.path.join(roiLoc, 'MNI_OCC_mask.nii.gz')
 
@@ -58,13 +59,10 @@ def tractography(args):
         if not os.path.isfile(brainStem):
             get_mask_from_fs(aseg_img, brainStem)
 
-        wm_mask =  os.path.join(roiLoc, 'lh_wm_mask.nii.gz')
-        if not os.path.isfile(wm_mask):
-            get_mask_from_fs(aseg_img, wm_mask)
-
-        wm_mask =  os.path.join(roiLoc, 'rh_wm_mask.nii.gz')
-        if not os.path.isfile(wm_mask):
-            get_mask_from_fs(aseg_img, wm_mask)
+        for side in ['lh','rh']:
+            wm_mask =  os.path.join(roiLoc, side+'_wm_mask.nii.gz')
+            if not os.path.isfile(wm_mask):
+                get_mask_from_fs(aseg_img, wm_mask)
 
         for side in ['lh', 'rh']:
             thalamusROI = os.path.join(roiLoc, side+'_thalamus.nii.gz')
@@ -92,7 +90,9 @@ def tractography(args):
 
             for fsMask in [fs_FC_wm, fs_TC_wm, fs_PC_wm, fs_OCC_wm]:
                 if not os.path.isfile(fsMask):
-                    get_mask_from_fs(aseg_img, fsMask)
+                    get_mask_from_fs(wmparc_img, fsMask)
+                if os.path.isfile(fsMask):
+                    get_mask_from_fs(wmparc_img, fsMask)
 
             # Merged exclusion_masks
             TC_thal_ex_mask = os.path.join(roiLoc, side+'_TC_thal_ex_mask.nii.gz')

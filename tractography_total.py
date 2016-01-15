@@ -133,7 +133,7 @@ def tractography(args):
     
             #if not os.path.isfile(FC_TC_ex_mask):
             add_files(brainStem,
-                    [contra_wm, post_TC_plane, MNI_OCC_mask_reg, fs_OCC_wm, fs_PC_wm],
+                    [contra_wm, post_TC_plane, MNI_OCC_mask_reg, fs_OCC_wm, fs_PC_wm, thalamusROI],
                     FC_TC_ex_mask)
 
     # Dictionary for datasource

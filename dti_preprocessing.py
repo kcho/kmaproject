@@ -62,22 +62,27 @@ def dti_preprocessing(args):
         eddy_out = os.path.join(dtiDir, 'data_eddy.nii.gz')
         newBvec = os.path.join(dtiDir, 'bvecs_new')
         nodif = os.path.join(dtiDir, 'nodif.nii.gz')
+        nodif_brain = os.path.join(dtiDir, 'nodif_brain.nii.gz')
         nodif_brain_mask = os.path.join(dtiDir, 'nodif_brain_mask.nii.gz')
         fa_map = os.path.join(dtiDir, 'dti_FA.nii.gz')
+        bedpostxdir = os.path.join(subject, 'DTI.bedpostX')
 
         if not os.path.isfile(eddy_out):
             eddy = fsl.EddyCorrect(
                     in_file = data,
                     out_file = eddy_out)
             eddy.run()
-            if not os.path.isfile(newBvec):
-                bvecCorrectCommand = 'bash fdt_rotate_bvecs.sh \
-                        {origBvec} {newBvec} {ecclog}'.format(
-                        origBvec = bvec,
-                        newBvec = newBvec,
-                        ecclog = eddy_out.split('nii.gz')[0]+'ecclog'
-                        )
-                os.popen(bvecCorrectCommand).read()
+
+        if not os.path.isfile(newBvec):
+            bvecCorrectCommand = 'bash /Volumes/CCNC_3T/KMA/kmaproject/fdt_rotate_bvecs.sh \
+                    {origBvec} {newBvec} {ecclog}'.format(
+                    origBvec = bvec,
+                    newBvec = newBvec,
+                    ecclog = eddy_out.split('nii.gz')[0]+'ecclog'
+                    )
+            print bvecCorrectCommand
+            os.popen(bvecCorrectCommand).read()
+
 
         if not os.path.isfile(nodif):
             extractROI = fsl.ExtractROI(
@@ -91,7 +96,8 @@ def dti_preprocessing(args):
             bet = fsl.BET(
                     in_file = eddy_out,
                     frac = .35,
-                    mask = nodif_brain_mask
+                    mask = True,
+                    out_file = nodif_brain
                     )
             bet.run()
                     
@@ -102,8 +108,23 @@ def dti_preprocessing(args):
                     bvecs = newBvec,
                     dwi = eddy_out,
                     mask = nodif_brain_mask,
-                    base_name = 'DTI')
+                    base_name = dtiDir+'/DTI')
             dtifit.run()
+
+        if not os.path.isdir(bedpostxdir):
+            #params = dict(n_fibres = 2,
+                    #fudge = 1,
+                    #burn_in = 1000,
+                    #n_jumps = 1250,
+                    #sample_every = 25)
+            bedpostx = fsl.BEDPOSTX4(
+                    bpx_directory = bedpostxdir,
+                    bvecs = newBvec,
+                    bvals = bval,
+                    dwi = eddy_out,
+                    mask = nodif_brain_mask,
+                    fibres = 2)
+            bedpostx.run()
 
 
 

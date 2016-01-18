@@ -119,6 +119,7 @@ def dti_preprocessing(args):
                     #sample_every = 25)
             bedpostx = fsl.BEDPOSTX4(
                     bpx_directory = bedpostxdir,
+                    logdir = bedpostxdir,
                     bvecs = newBvec,
                     bvals = bval,
                     dwi = eddy_out,

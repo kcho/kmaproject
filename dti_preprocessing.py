@@ -12,6 +12,8 @@ import textwrap
 import re, glob
 import os                                    # system functions
 import shutil
+from nipype.workflows.dmri.fsl.dti import create_bedpostx_pipeline
+from nipype.workflows.dmri.fsl.dti import bedpostx_parallel
 
 
 def dti_preprocessing(args):
@@ -111,22 +113,42 @@ def dti_preprocessing(args):
                     base_name = dtiDir+'/DTI')
             dtifit.run()
 
-        if not os.path.isdir(bedpostxdir):
-            #params = dict(n_fibres = 2,
-                    #fudge = 1,
-                    #burn_in = 1000,
-                    #n_jumps = 1250,
-                    #sample_every = 25)
-            bedpostx = fsl.BEDPOSTX5(
-                    bpx_directory = bedpostxdir,
-                    #logdir = bedpostxdir,
-                    out_dir = bedpostxdir,
-                    bvecs = newBvec,
-                    bvals = bval,
-                    dwi = eddy_out,
-                    mask = nodif_brain_mask,
-                    fibres = 2)
-            bedpostx.run()
+
+        params = dict(n_fibres = 2,
+                fudge = 1,
+                burn_in = 1000,
+                n_jumps = 1250,
+                sample_every = 25)
+
+        bpwf = create_bedpostx_pipeline('nipype_bedpostx', params)
+        bpwf.inputs.inputnode.dwi = eddy_out
+        bpwf.inputs.inputnode.mask = nodif_brain_mask
+        bpwf.inputs.inputnode.bvecs = newBvec
+        bpwf.inputs.inputnode.bvals = bval
+        bpwf.run()
+
+
+        #params = dict(n_fibres = 2, fudge = 1, burn_in = 1000,
+                #n_jumps = 1250, sample_every = 25)
+        #bpwf = bedpostx_parallel('nipype_bedpostx_parallel', params)
+        #bpwf.inputs.inputnode.dwi = eddy_out
+        #bpwf.inputs.inputnode.mask = nodif_brain_mask
+        #bpwf.inputs.inputnode.bvecs = newBvec
+        #bpwf.inputs.inputnode.bvals = bval
+        #bpwf.run(plugin='CondorDAGMan')
+
+                #if not os.path.isdir(bedpostxdir):
+        #bedpostx = fsl.BEDPOSTX5(
+                #bpx_directory = bedpostxdir,
+                ##logdir = bedpostxdir,
+                #out_dir = bedpostxdir,
+                #bvecs = newBvec,
+                #bvals = bval,
+                #dwi = eddy_out,
+                #mask = nodif_brain_mask,
+                #uskmae_gpu=True,
+                #n_fibres = 2)
+        #bedpostx.run()
 
 
 

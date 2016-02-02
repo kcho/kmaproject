@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/ccnc_bin/Canopy_env/User/bin/python
 import nipype.interfaces.io as nio           # Data i/o
 import nipype.interfaces.fsl as fsl          # fsl
 import nipype.interfaces.freesurfer as fs
@@ -43,15 +43,21 @@ def tractography(args):
     - A coronal plane posterior to the temporal cortex
     '''
 
-    dataLoc = '/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project'
+    dataLoc = '/home/kangik/bedpostCollect/kma'
     subject_list = args.subjects
 
     # Make exclusion mask in order to exclude tracks
     # going towards posterior paths from the thalamus
+
+    # python way
+    jobs = []
+
     for subject in subject_list:
         roiLoc = os.path.join(dataLoc, subject, 'ROI')
+        bedpostLoc = os.path.join(dataLoc, subject, 'DTI.bedpostX')
         aseg_img = os.path.join(dataLoc, subject, 'FREESURFER/mri/aseg.mgz')
         wmparc_img= os.path.join(dataLoc, subject, 'FREESURFER/mri/wmparc.mgz')
+        reg_file = os.path.join(dataLoc, subject, 'registration/FREESURFERT1toNodif.mat')
         MNI_TC_mask_reg = os.path.join(roiLoc, 'MNI_TC_mask.nii.gz')
         MNI_OCC_mask_reg = os.path.join(roiLoc, 'MNI_OCC_mask.nii.gz')
 
@@ -65,6 +71,11 @@ def tractography(args):
                 get_mask_from_fs(aseg_img, wm_mask)
 
         for side in ['lh', 'rh']:
+            outDir = os.path.join(dataLoc, subject, 'tractography', side)
+            try:
+                os.mkdir(outDir)
+            except:
+                pass
             thalamusROI = os.path.join(roiLoc, side+'_thalamus.nii.gz')
             LTC = os.path.join(roiLoc, side+'_LTC.nii.gz')
             MTC = os.path.join(roiLoc, side+'_MTC.nii.gz')
@@ -121,131 +132,169 @@ def tractography(args):
 
 
             # Exclusion masks
-            #if not os.path.isfile(TC_thal_ex_mask):
-            add_files(brainStem,
-                    [contra_wm, ant_thal_ex_mask, post_TC_plane, fs_OCC_wm, fs_PC_wm],
-                    TC_thal_ex_mask)
+            if not os.path.isfile(TC_thal_ex_mask):
+                add_files(brainStem,
+                        [contra_wm, ant_thal_ex_mask, post_TC_plane, fs_OCC_wm, fs_PC_wm],
+                        TC_thal_ex_mask)
 
-            #if not os.path.isfile(FC_thal_ex_mask):
-            add_files(brainStem,
-                    [contra_wm, post_thal_plane, fs_TC_wm, fs_OCC_wm, fs_PC_wm],
-                    FC_thal_ex_mask)
+            if not os.path.isfile(FC_thal_ex_mask):
+                add_files(brainStem,
+                        [contra_wm, post_thal_plane, fs_TC_wm, fs_OCC_wm, fs_PC_wm],
+                        FC_thal_ex_mask)
     
-            #if not os.path.isfile(FC_TC_ex_mask):
-            add_files(brainStem,
-                    [contra_wm, post_TC_plane, MNI_OCC_mask_reg, fs_OCC_wm, fs_PC_wm, thalamusROI],
-                    FC_TC_ex_mask)
+            if not os.path.isfile(FC_TC_ex_mask):
+                add_files(brainStem,
+                        [contra_wm, post_TC_plane, MNI_OCC_mask_reg, fs_OCC_wm, fs_PC_wm, thalamusROI],
+                        FC_TC_ex_mask)
+
+
+
+
+            FC_TC_prob_command = '/usr/local/fsl/bin/probtrackx2 \
+                    -x {thalamusSeed} \
+                    -l \
+                    --onewaycondition \
+                    -c 0.2 \
+                    -S 2000 \
+                    --steplength=0.5 \
+                    -P 5000 \
+                    --fibthresh=0.01 \
+                    --distthresh=0.0 \
+                    --sampvox=0.0 \
+                    --xfm={freesurferT1toNodif} \
+                    --avoid={exclusionMask} \
+                    --stop={targetMask} \
+                    --forcedir \
+                    --opd \
+                    -s {bedpostLoc}/merged \
+                    -m {bedpostLoc}/nodif_brain_mask \
+                    --dir={outDir} \
+                    --waypoints={targetMask} \
+                    --waycond=AND'.format(thalamusSeed = TC_ROI,
+                            freesurferT1toNodif = reg_file,
+                            exclusionMask = FC_TC_ex_mask,
+                            bedpostLoc = bedpostLoc,
+                            outDir = outDir,
+                            targetMask = FC_ROI)
+            jobs.append(re.sub('\s+',' ',FC_TC_prob_command))
+
+                             
+
+    for job in jobs:
+        print job
+        print
+
 
     # Dictionary for datasource
-    info = dict(dwi=[['subject_id', 'data']],
-                bvecs=[['subject_id', 'bvecs']],
-                bvals=[['subject_id', 'bvals']],
-                SEED=[['subject_id', 
-                    ['thalamus', 
-                     'thalamus',
-                     'TC']]],
-                STOP=[['subject_id', 
-                    ['FC',
-                     'TC',
-                     'FC']]],
-                avoid_mask = [['subject_id', 
-                    ['FC_thal_ex_mask',
-                     'TC_thal_ex_mask',
-                     'FC_TC_ex_mask']]],
-                thsample = [['subject_id',
-                    ['merged_th1samples','merged_th2samples']]],
-                phsample = [['subject_id',
-                    ['merged_ph1samples','merged_ph2samples']]],
-                fsample = [['subject_id',
-                    ['merged_f1samples','merged_f2samples']]],
-                matrix = [['subject_id','FREESURFERT1toNodif.mat']],
-                bet_mask = [['subject_id','nodif_brain_mask']],
-                fsLoc = [['subject_id','freesurfer']],
-                aseg = [['subject_id','aseg']],
-                aparc_aseg= [['subject_id','aparc+aseg']],
-                )
+    #info = dict(dwi=[['subject_id', 'data']],
+                #bvecs=[['subject_id', 'bvecs']],
+                #bvals=[['subject_id', 'bvals']],
+                #SEED=[['subject_id', 
+                    #['thalamus', 
+                     #'thalamus',
+                     #'TC']]],
+                #STOP=[['subject_id', 
+                    #['FC',
+                     #'TC',
+                     #'FC']]],
+                #avoid_mask = [['subject_id', 
+                    #['FC_thal_ex_mask',
+                     #'TC_thal_ex_mask',
+                     #'FC_TC_ex_mask']]],
+                #thsample = [['subject_id',
+                    #['merged_th1samples','merged_th2samples']]],
+                #phsample = [['subject_id',
+                    #['merged_ph1samples','merged_ph2samples']]],
+                #fsample = [['subject_id',
+                    #['merged_f1samples','merged_f2samples']]],
+                #matrix = [['subject_id','FREESURFERT1toNodif.mat']],
+                #bet_mask = [['subject_id','nodif_brain_mask']],
+                #fsLoc = [['subject_id','freesurfer']],
+                #aseg = [['subject_id','aseg']],
+                #aparc_aseg= [['subject_id','aparc+aseg']],
+                #)
 
-    # Subject name list setting into identity interface
-    infosource = pe.Node(interface=util.IdentityInterface(fields=['subject_id']),
-                         name="infosource")
-    infosource.iterables = ('subject_id', subject_list)
-
-
-    # Data source setting
-    datasource = pe.Node(interface=nio.DataGrabber(infields=['subject_id'],
-                                                   outfields=info.keys()),
-                         name = 'datasource')
-    datasource.inputs.template = "%s/%s"
-    datasource.inputs.base_directory = os.path.abspath(dataLoc)
-    datasource.inputs.field_template = dict(dwi='%s/dti/%s.nii.gz',
-                                            bvecs='%s/dti/%s',
-                                            bvals='%s/dti/%s',
-                                            SEED='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            STOP='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            avoid_mask='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
-                                            matrix='%s/registration/%s',
-                                            bet_mask='%s/dti/%s.nii.gz',
-                                            thsample='%s/DTI.bedpostX/%s.nii.gz',
-                                            fsample='%s/DTI.bedpostX/%s.nii.gz',
-                                            phsample='%s/DTI.bedpostX/%s.nii.gz',
-                                            fsLoc='%s/%s',
-                                            aseg='%s/FREESURFER/mri/%s.mgz',
-                                            aparc_aseg='%s/FREESURFER/mri/%s.mgz',
-                                            )
-    datasource.inputs.template_args = info
-    datasource.inputs.sort_filelist = True
+    ## Subject name list setting into identity interface
+    #infosource = pe.Node(interface=util.IdentityInterface(fields=['subject_id']),
+                         #name="infosource")
+    #infosource.iterables = ('subject_id', subject_list)
 
 
+    ## Data source setting
+    #datasource = pe.Node(interface=nio.DataGrabber(infields=['subject_id'],
+                                                   #outfields=info.keys()),
+                         #name = 'datasource')
+    #datasource.inputs.template = "%s/%s"
+    #datasource.inputs.base_directory = os.path.abspath(dataLoc)
+    #datasource.inputs.field_template = dict(dwi='%s/dti/%s.nii.gz',
+                                            #bvecs='%s/dti/%s',
+                                            #bvals='%s/dti/%s',
+                                            #SEED='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            #STOP='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            #avoid_mask='%s/ROI/{side}_%s.nii.gz'.format(side=args.side),
+                                            #matrix='%s/registration/%s',
+                                            #bet_mask='%s/dti/%s.nii.gz',
+                                            #thsample='%s/DTI.bedpostX/%s.nii.gz',
+                                            #fsample='%s/DTI.bedpostX/%s.nii.gz',
+                                            #phsample='%s/DTI.bedpostX/%s.nii.gz',
+                                            #fsLoc='%s/%s',
+                                            #aseg='%s/FREESURFER/mri/%s.mgz',
+                                            #aparc_aseg='%s/FREESURFER/mri/%s.mgz',
+                                            #)
+    #datasource.inputs.template_args = info
+    #datasource.inputs.sort_filelist = True
 
-    # Probabilistic tractography
-    probtrackx = pe.MapNode(interface=fsl.ProbTrackX2(), 
-            name='TC_FC_probtrackx_detailed',
-            iterfield = ['seed', 'stop_mask', 'waypoints', 'avoid_mp']
-            )
-    probtrackx.inputs.onewaycondition= True
-
-    #Below are the default options
-    #probtrackx.inputs.waycond = 'AND'
-    #probtrackx.inputs.c_thresh = 0.2
-    #probtrackx.inputs.n_steps = 2000
-    #probtrackx.inputs.step_length = 0.5
-    #probtrackx.inputs.n_samples = 5000
-    #probtrackx.inputs.opd = True
-    #probtrackx.inputs.os2t = True
-    #probtrackx.inputs.loop_check = True
 
 
-    # Data sink
-    datasink = pe.Node(interface=nio.DataSink(),name='datasink')
-    datasink.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project/tractography')
-    datasink.inputs.substitutions = [('_variable', 'variable'),
-                                     ('_subject_id_', '')]
+    ## Probabilistic tractography
+    #probtrackx = pe.MapNode(interface=fsl.ProbTrackX2(), 
+            #name='TC_FC_probtrackx_detailed',
+            #iterfield = ['seed', 'stop_mask', 'waypoints', 'avoid_mp']
+            #)
+    #probtrackx.inputs.onewaycondition= True
 
-    # Workflow 
-    dwiproc = pe.Workflow(name="Thal_TC_FC")
-    dwiproc.base_dir = os.path.abspath('Processing')
-    dwiproc.connect([
-                        (infosource,datasource,[('subject_id', 'subject_id')]),
-                        (datasource,probtrackx,[('SEED','seed'),
-                                                   ('STOP','stop_mask'),
-                                                   ('STOP','waypoints'),
-                                                   ('avoid_mask','avoid_mp'),
-                                                   ('bet_mask','mask'),
-                                                   ('phsample','phsamples'),
-                                                   ('fsample','fsamples'),
-                                                   ('thsample','thsamples'),
-                                                   ('matrix','xfm'),
-                                                   ]),
-                        (probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
-                            ('log', 'probtrackx.@log'),
-                            ('particle_files', 'probtrackx.@particle_files'),
-                            ('targets', 'probtrackx.@targets'),
-                            ('way_total', 'probtrackx.@way_total'),
-                            ])
-                    ])
+    ##Below are the default options
+    ##probtrackx.inputs.waycond = 'AND'
+    ##probtrackx.inputs.c_thresh = 0.2
+    ##probtrackx.inputs.n_steps = 2000
+    ##probtrackx.inputs.step_length = 0.5
+    ##probtrackx.inputs.n_samples = 5000
+    ##probtrackx.inputs.opd = True
+    ##probtrackx.inputs.os2t = True
+    ##probtrackx.inputs.loop_check = True
 
-    # Parallel processing
-    dwiproc.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
+
+    ## Data sink
+    #datasink = pe.Node(interface=nio.DataSink(),name='datasink')
+    #datasink.inputs.base_directory = os.path.abspath('/Volumes/CCNC_3T_2/kcho/ccnc/GHR_project/tractography')
+    #datasink.inputs.substitutions = [('_variable', 'variable'),
+                                     #('_subject_id_', '')]
+
+    ## Workflow 
+    #dwiproc = pe.Workflow(name="Thal_TC_FC")
+    #dwiproc.base_dir = os.path.abspath('Processing')
+    #dwiproc.connect([
+                        #(infosource,datasource,[('subject_id', 'subject_id')]),
+                        #(datasource,probtrackx,[('SEED','seed'),
+                                                   #('STOP','stop_mask'),
+                                                   #('STOP','waypoints'),
+                                                   #('avoid_mask','avoid_mp'),
+                                                   #('bet_mask','mask'),
+                                                   #('phsample','phsamples'),
+                                                   #('fsample','fsamples'),
+                                                   #('thsample','thsamples'),
+                                                   #('matrix','xfm'),
+                                                   #]),
+                        #(probtrackx,datasink,[('fdt_paths','probtrackx.@fdt_paths'),
+                            #('log', 'probtrackx.@log'),
+                            #('particle_files', 'probtrackx.@particle_files'),
+                            #('targets', 'probtrackx.@targets'),
+                            #('way_total', 'probtrackx.@way_total'),
+                            #])
+                    #])
+
+    ## Parallel processing
+    #dwiproc.run(plugin='MultiProc', plugin_args={'n_procs' : 8})
 
 
 def thal_TC_posterior(thalamusImg, TC_img, outFile):
@@ -286,8 +335,8 @@ def get_MNI_mask_reg(dataLoc, subject, outROI):
     MNI_mask = os.path.basename(outROI)[3:]
     roiLoc = os.path.join(dataLoc, subject, 'ROI')
     mni2subj = os.path.join(roiLoc, 'mni2subj.mat')
-    subjBrain = os.path.join(dataLoc, subject, 'FREESURFER',
-                        'mri','brain.nii.gz')
+    subjBrain = os.path.join(dataLoc, subject, 'FREESURFER', 
+            'mri','brain.nii.gz')
     atlasLoc = '/usr/local/fsl/data/atlases/MNI/MNI-maxprob-thr0-1mm.nii.gz'
 
     if outROI.endswith('TC_mask.nii.gz'):

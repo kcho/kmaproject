@@ -82,6 +82,7 @@ def tractography(args):
             TC_ROI = os.path.join(roiLoc, side+'_TC.nii.gz')
 
             OFC = os.path.join(roiLoc, side+'_OFC.nii.gz')
+            IFG = os.path.join(roiLoc, side+'_IFG.nii.gz')
             LPFC = os.path.join(roiLoc, side+'_LPFC.nii.gz')
             MPFC = os.path.join(roiLoc, side+'_MPFC.nii.gz')
             FC_ROI = os.path.join(roiLoc, side+'_FC.nii.gz')
@@ -103,6 +104,8 @@ def tractography(args):
                 if not os.path.isfile(fsMask):
                     get_mask_from_fs(wmparc_img, fsMask)
 
+            if not os.path.isfile(IFG):
+                get_mask_from_fs(aseg_img, IFG)
             # Merged exclusion_masks
             TC_thal_ex_mask = os.path.join(roiLoc, side+'_TC_thal_ex_mask.nii.gz')
             FC_thal_ex_mask = os.path.join(roiLoc, side+'_FC_thal_ex_mask.nii.gz')
@@ -413,10 +416,17 @@ def get_opposite(side):
 def get_mask_from_fs(aseg_img, binaryROI):
     if binaryROI.endswith('brain_stem.nii.gz'):
         match = [16, 6, 7, 8, 45, 46, 47]
+
+    elif binaryROI.endswith('lh_IFG.nii.gz'):
+        match = [1018, 1019, 1020]
+    elif binaryROI.endswith('rh_IFG.nii.gz'):
+        match = [2018, 2019, 2020]
+
     elif binaryROI.endswith('lh_wm_mask.nii.gz'):
         match = [2]
     elif binaryROI.endswith('rh_wm_mask.nii.gz'):
         match = [41]
+
     elif binaryROI.endswith('lh_fs_FC_wm.nii.gz'):
         match = [3002, 3026, 3028, 3020, 3027, 3032, 3018, 3019, 3014, 3012]
     elif binaryROI.endswith('rh_fs_FC_wm.nii.gz'):
@@ -441,6 +451,7 @@ def get_mask_from_fs(aseg_img, binaryROI):
         match = [3021, 3013, 3011, 3005]
     elif binaryROI.endswith('rh_fs_OCC_wm.nii.gz'):
         match = [4021, 4013, 4011, 4005]
+
 
     binarize = fs.Binarize(out_type='nii.gz',
             match = match,

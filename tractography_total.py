@@ -56,6 +56,7 @@ def tractography(args):
         roiLoc = os.path.join(dataLoc, subject, 'ROI')
         bedpostLoc = os.path.join(dataLoc, subject, 'DTI.bedpostX')
         aseg_img = os.path.join(dataLoc, subject, 'FREESURFER/mri/aseg.mgz')
+        aparc_img = os.path.join(dataLoc, subject, 'FREESURFER/mri/aparc+aseg.mgz')
         wmparc_img= os.path.join(dataLoc, subject, 'FREESURFER/mri/wmparc.mgz')
         reg_file = os.path.join(dataLoc, subject, 'registration/FREESURFERT1toNodif.mat')
         MNI_TC_mask_reg = os.path.join(roiLoc, 'MNI_TC_mask.nii.gz')
@@ -79,6 +80,7 @@ def tractography(args):
             thalamusROI = os.path.join(roiLoc, side+'_thalamus.nii.gz')
             LTC = os.path.join(roiLoc, side+'_LTC.nii.gz')
             MTC = os.path.join(roiLoc, side+'_MTC.nii.gz')
+            STG = os.path.join(roiLoc, side+'_STG.nii.gz')
             TC_ROI = os.path.join(roiLoc, side+'_TC.nii.gz')
 
             OFC = os.path.join(roiLoc, side+'_OFC.nii.gz')
@@ -94,6 +96,7 @@ def tractography(args):
             # Freesurfer exclusion mask
             wm_mask =  os.path.join(roiLoc, side+'_wm_mask.nii.gz')
             contra_wm = re.sub(side, get_opposite(side), wm_mask)
+            fs_claustrum_wm = os.path.join(roiLoc, side+'_fs_claustrum_wm.nii.gz')
             fs_FC_wm = os.path.join(roiLoc, side+'_fs_FC_wm.nii.gz')
             fs_TC_wm = os.path.join(roiLoc, side+'_fs_TC_wm.nii.gz')
             fs_PC_wm = os.path.join(roiLoc, side+'_fs_PC_wm.nii.gz')
@@ -104,12 +107,20 @@ def tractography(args):
                 if not os.path.isfile(fsMask):
                     get_mask_from_fs(wmparc_img, fsMask)
 
+            if not os.path.isfile(fs_claustrum_wm):
+                get_mask_from_fs(aseg_img, fs_claustrum_wm)
+
             if not os.path.isfile(IFG):
-                get_mask_from_fs(aseg_img, IFG)
+                get_mask_from_fs(aparc_img, IFG)
+
+            if not os.path.isfile(STG):
+                get_mask_from_fs(aparc_img, STG)
             # Merged exclusion_masks
             TC_thal_ex_mask = os.path.join(roiLoc, side+'_TC_thal_ex_mask.nii.gz')
             FC_thal_ex_mask = os.path.join(roiLoc, side+'_FC_thal_ex_mask.nii.gz')
             FC_TC_ex_mask = os.path.join(roiLoc, side+'_FC_TC_ex_mask.nii.gz')
+            IFG_STG_ex_mask = os.path.join(roiLoc, side+'_IFG_STG_ex_mask.nii.gz')
+
 
             if not os.path.isfile(MNI_TC_mask_reg):
                 get_MNI_mask_reg(dataLoc, subject, MNI_TC_mask_reg)
@@ -150,6 +161,10 @@ def tractography(args):
                         [contra_wm, post_TC_plane, MNI_OCC_mask_reg, fs_OCC_wm, fs_PC_wm, thalamusROI],
                         FC_TC_ex_mask)
 
+            if not os.path.isfile(IFG_STG_ex_mask):
+                add_files(brainStem,
+                        [contra_wm, post_TC_plane, MNI_OCC_mask_reg, fs_claustrum_wm, fs_OCC_wm, fs_PC_wm, thalamusROI],
+                        FC_TC_ex_mask)
 
 
 
@@ -173,12 +188,13 @@ def tractography(args):
                     -m {bedpostLoc}/nodif_brain_mask \
                     --dir={outDir} \
                     --waypoints={targetMask} \
-                    --waycond=AND'.format(thalamusSeed = TC_ROI,
+                    --waycond=AND'.format(thalamusSeed = STG,
                             freesurferT1toNodif = reg_file,
                             exclusionMask = FC_TC_ex_mask,
                             bedpostLoc = bedpostLoc,
                             outDir = outDir,
-                            targetMask = FC_ROI)
+                            targetMask = IFG)
+
             jobs.append(re.sub('\s+',' ',FC_TC_prob_command))
 
                              
@@ -416,16 +432,25 @@ def get_opposite(side):
 def get_mask_from_fs(aseg_img, binaryROI):
     if binaryROI.endswith('brain_stem.nii.gz'):
         match = [16, 6, 7, 8, 45, 46, 47]
-
     elif binaryROI.endswith('lh_IFG.nii.gz'):
         match = [1018, 1019, 1020]
     elif binaryROI.endswith('rh_IFG.nii.gz'):
         match = [2018, 2019, 2020]
 
+    elif binaryROI.endswith('lh_STG.nii.gz'):
+        match = [1030]
+    elif binaryROI.endswith('rh_STG.nii.gz'):
+        match = [2030]
+
     elif binaryROI.endswith('lh_wm_mask.nii.gz'):
         match = [2]
     elif binaryROI.endswith('rh_wm_mask.nii.gz'):
         match = [41]
+
+    elif binaryROI.endswith('lh_fs_claustrum_wm.nii.gz'):
+        match = [138]
+    elif binaryROI.endswith('rh_fs_claustrum_wm.nii.gz'):
+        match = [139]
 
     elif binaryROI.endswith('lh_fs_FC_wm.nii.gz'):
         match = [3002, 3026, 3028, 3020, 3027, 3032, 3018, 3019, 3014, 3012]

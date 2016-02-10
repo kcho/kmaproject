@@ -363,7 +363,6 @@ def get_MNI_mask_reg(dataLoc, subject, outROI):
     elif outROI.endswith('OCC_mask.nii.gz'):
         op_string = '-thr 5 -uthr 5'
 
-    print outROI, op_string
 
 
     # Registration
@@ -492,7 +491,6 @@ def add_files(in_file, in_file2, out_file):
             op_string = op_string,
             out_file = out_file,
             )
-    print merge.cmdline
     merge.run()
 
 if __name__ == '__main__':

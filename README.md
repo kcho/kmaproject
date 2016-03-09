@@ -1,20 +1,49 @@
 # Probabilistic tractography project
 
-1. Thalamo - frontal
-2. Thalamo - temporal
-3. Temporo - frontal
+It runs three probabilistic tractography runs between
+- temporal cortex
+- frontal cortex
+- thalamus
 
+It requires FSL, Freesurfer and nipype.
 
-## Dependency
+Each subject directory under the dataLoc must be 
+structured as the format below
 
-- Freesurfer
-- FSL
-- Nipype
-- Nibabel
-- Numpy
+```
+dataLoc
+├── subjectDir1
+│   ├── FREESURFER
+│   ├── DTI.bedpostX
+│   ├── registration
+│   │    └──FREESURFERT1toNodif.mat
+│   │       (from flirt between Freesurfer Brain.mgz
+│   │       and DTI nodif)
+│   └── ROI
+│
+├── subjectDir2
+```
 
+Temporal cortex labels are
+- Superior, Middle, and Inferior Temporal
+- Banks of the Superior Temporal Sulcus
+- Fusiform
+- Transverse Temporal
+- Entorhinal
+- Temporal Pole
+- Parahippocampal
 
-## Flow
+Frontal cortex labels are
+- Superior Frontal
+- Rostral and Caudal Middle Frontal
+- Pars Opercularis, Pars Triangularis, and Pars Orbitalis
+- Lateral and Medial Orbitofrontal
+- Precentral
+- Paracentral
+- Frontal Pole
 
-1. Begins from the 
-
+Exclusion masks are
+- WM in the contralateral hemisphere 
+- Brain stem
+- Cerebellum 
+- A coronal plane posterior to the temporal cortex

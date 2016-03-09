@@ -1,10 +1,10 @@
 #!/ccnc_bin/Canopy_env/User/bin/python
 import nipype.interfaces.io as nio           # Data i/o
 import nipype.interfaces.fsl as fsl          # fsl
-import nipype.interfaces.freesurfer as fs
+import nipype.interfaces.freesurfer as fs    # freesurfer
 import nipype.interfaces.utility as util     # utility
 import nipype.pipeline.engine as pe          # pypeline engine
-import nibabel as nb
+import nibabel as nb                         
 import numpy as np
 import argparse
 import textwrap
@@ -14,9 +14,29 @@ import os                                    # system functions
 
 def tractography(args):
     '''
-    It runs probabilistic tractography
-    from temporal cortex to frontal cortex.
+    It runs three probabilistic tractography runs between
+    - temporal cortex
+    - frontal cortex
+    - thalamus
+
     It requires FSL, Freesurfer and nipype.
+
+    Each subject directory under the dataLoc must be 
+    structured as the format below
+
+    ```
+    dataLoc
+    ├── subjectDir1
+    │   ├── FREESURFER
+    │   ├── DTI.bedpostX
+    │   ├── registration
+    │   │    └──FREESURFERT1toNodif.mat
+    │   │       (from flirt between Freesurfer Brain.mgz
+    │   │       and DTI nodif)
+    │   └── ROI
+    │
+    ├── subjectDir2
+    ```
 
     Temporal cortex labels are
     - Superior, Middle, and Inferior Temporal

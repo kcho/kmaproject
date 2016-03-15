@@ -28,6 +28,7 @@ def dti_preprocessing(args):
     # going towards posterior paths from the thalamus
     for subject in subject_list:
         dtiDir = os.path.join(dataLoc, subject, 'DTI')
+        bedpostxDir = os.path.join(dataLoc, subject, 'DTI.bedpostX')
 
         # Check dicom
         dicoms = glob.glob(dtiDir+'/*dcm') + \
@@ -120,18 +121,26 @@ def dti_preprocessing(args):
             dtifit.run()
 
 
-        params = dict(n_fibres = 2,
-                fudge = 1,
-                burn_in = 1000,
-                n_jumps = 1250,
-                sample_every = 25)
+        #params = dict(n_fibres = 2,
+                #fudge = 1,
+                #burn_in = 1000,
+                #n_jumps = 1250,
+                #sample_every = 25)
 
-        bpwf = create_bedpostx_pipeline('nipype_bedpostx', params)
-        bpwf.inputs.inputnode.dwi = eddy_out
-        bpwf.inputs.inputnode.mask = nodif_brain_mask
-        bpwf.inputs.inputnode.bvecs = newBvec
-        bpwf.inputs.inputnode.bvals = newBval
-        bpwf.run()
+        #bpwf = create_bedpostx_pipeline('nipype_bedpostx', params)
+        #bpwf.inputs.inputnode.dwi = eddy_out
+        #bpwf.inputs.inputnode.mask = nodif_brain_mask
+        #bpwf.inputs.inputnode.bvecs = newBvec
+        #bpwf.inputs.inputnode.bvals = newBval
+        #bpwf.run()
+
+
+        if args.bedpostx:
+            if not os.path.isdir(bedpostxdir):
+                command = 'bedpostx {0}'.format(dtiDir)
+                print os.popen(command).read()
+
+
 
 
         #params = dict(n_fibres = 2, fudge = 1, burn_in = 1000,
@@ -169,6 +178,11 @@ if __name__ == '__main__':
         '-s', '--subjects',
         help='subject list',
         nargs='+')
+
+    parser.add_argument(
+        '-b', '--bedpostx',
+        help='Run bedpostx',
+        action='store_true', default=True)
     #parser.add_argument(
         #'-side', '--side',
         #help='side')

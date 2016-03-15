@@ -11,6 +11,7 @@ import argparse
 import textwrap
 import re, glob
 import os                                    # system functions
+import sys
 import shutil
 from nipype.workflows.dmri.fsl.dti import create_bedpostx_pipeline
 from nipype.workflows.dmri.fsl.dti import bedpostx_parallel
@@ -20,7 +21,7 @@ def dti_preprocessing(args):
     '''
     Write it later
     '''
-    dataLoc = '/Volumes/CCNC_3T/KMA'
+    dataLoc = os.getcwd()#'/Volumes/CCNC_3T/KMA'
     subject_list = args.subjects
 
     # Make exclusion mask in order to exclude tracks
@@ -61,13 +62,18 @@ def dti_preprocessing(args):
         bval = glob.glob(dtiDir+'/2*.bval')[0]
 
         # preprocessed data
-        eddy_out = os.path.join(dtiDir, 'data_eddy.nii.gz')
-        newBvec = os.path.join(dtiDir, 'bvecs_new')
+        eddy_out = os.path.join(dtiDir, 'data.nii.gz')
+        newBvec = os.path.join(dtiDir, 'bvecs')
+        newBval = os.path.join(dtiDir, 'bvals') # just a copy
         nodif = os.path.join(dtiDir, 'nodif.nii.gz')
         nodif_brain = os.path.join(dtiDir, 'nodif_brain.nii.gz')
         nodif_brain_mask = os.path.join(dtiDir, 'nodif_brain_mask.nii.gz')
         fa_map = os.path.join(dtiDir, 'dti_FA.nii.gz')
         bedpostxdir = os.path.join(subject, 'DTI.bedpostX')
+
+
+        if not os.path.isfile(newBval):
+            shutil.copy(bval, newBval)
 
         if not os.path.isfile(eddy_out):
             eddy = fsl.EddyCorrect(
@@ -124,7 +130,7 @@ def dti_preprocessing(args):
         bpwf.inputs.inputnode.dwi = eddy_out
         bpwf.inputs.inputnode.mask = nodif_brain_mask
         bpwf.inputs.inputnode.bvecs = newBvec
-        bpwf.inputs.inputnode.bvals = bval
+        bpwf.inputs.inputnode.bvals = newBval
         bpwf.run()
 
 

@@ -83,9 +83,10 @@ def dti_preprocessing(args):
             eddy.run()
 
         if not os.path.isfile(newBvec):
-            bvecCorrectCommand = 'bash /Volumes/CCNC_3T/KMA/kmaproject/fdt_rotate_bvecs.sh \
+            bvecCorrectCommand = 'bash {pwd}/fdt_rotate_bvecs.sh \
                     {origBvec} {newBvec} {ecclog}'.format(
                     origBvec = bvec,
+                    pwd=dataLoc,
                     newBvec = newBvec,
                     ecclog = eddy_out.split('nii.gz')[0]+'ecclog'
                     )
